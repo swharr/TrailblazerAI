@@ -9,16 +9,17 @@ TrailBlazer AI is an overland route planning and trail analysis application buil
 ## Commands
 
 ```bash
-npm run dev      # Start development server on http://localhost:3000
+npm run dev      # Start development server on http://localhost:3636
 npm run build    # Build for production
 npm run lint     # Run ESLint
+npm run format   # Format code with Prettier
 npm run start    # Start production server
 ```
 
 ### Docker Commands
 ```bash
 docker build -t trailblazer-ai:latest .
-docker run -p 3000:3000 trailblazer-ai:latest
+docker run -p 3636:3636 trailblazer-ai:latest
 ```
 
 ### Kubernetes Commands
