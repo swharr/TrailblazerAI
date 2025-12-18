@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trailblazer-ai
+  namespace: trailblazer-ai
+  labels:
+    app.kubernetes.io/name: trailblazer-ai
+  annotations:
+    # Uncomment for nginx ingress controller
+    # kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+    # Uncomment for cert-manager TLS
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # Uncomment and configure TLS
+  # tls:
+  #   - hosts:
+  #       - trailblazer.example.com
+  #     secretName: trailblazer-ai-tls
+  rules:
+    - host: trailblazer.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trailblazer-ai
+                port:
+                  name: http

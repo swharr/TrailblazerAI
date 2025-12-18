@@ -1,0 +1,27 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: trailblazer-ai
+  namespace: trailblazer-ai
+  labels:
+    app.kubernetes.io/name: trailblazer-ai
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trailblazer-ai
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: trailblazer-ai
+        minAllowed:
+          cpu: "50m"
+          memory: "128Mi"
+        maxAllowed:
+          cpu: "2"
+          memory: "2Gi"
+        controlledResources:
+          - cpu
+          - memory
+        controlledValues: RequestsAndLimits

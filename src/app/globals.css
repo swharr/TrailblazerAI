@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* TrailBlazer palette - Light mode */
+    /* Primary: Orange/Amber (#F97316, #FB923C) */
+    --background: 40 33% 98%;
+    --foreground: 30 20% 15%;
+    --card: 40 30% 96%;
+    --card-foreground: 30 20% 15%;
+    --popover: 40 33% 98%;
+    --popover-foreground: 30 20% 15%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 33 30% 85%;
+    --secondary-foreground: 30 20% 20%;
+    --muted: 35 20% 92%;
+    --muted-foreground: 30 15% 45%;
+    --accent: 174 72% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 33 25% 85%;
+    --input: 33 25% 85%;
+    --ring: 25 95% 53%;
+    --radius: 0.5rem;
+
+    /* Chart colors */
+    --chart-1: 25 95% 53%;
+    --chart-2: 174 72% 40%;
+    --chart-3: 33 50% 45%;
+    --chart-4: 142 40% 35%;
+    --chart-5: 15 60% 55%;
+
+    /* Custom trail colors */
+    --trail-green: 142 40% 30%;
+    --trail-brown: 30 35% 35%;
+    --trail-orange: 25 95% 53%;
+    --trail-tan: 35 40% 75%;
+    --trail-cream: 40 33% 95%;
+    --trail-teal: 174 72% 40%;
+
+    /* Sidebar */
+    --sidebar-background: 40 30% 96%;
+    --sidebar-foreground: 30 20% 15%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 35 20% 92%;
+    --sidebar-accent-foreground: 30 20% 15%;
+    --sidebar-border: 33 25% 85%;
+    --sidebar-ring: 25 95% 53%;
+  }
+
+  .dark {
+    /* TrailBlazer palette - Dark mode */
+    --background: 30 15% 8%;
+    --foreground: 40 20% 95%;
+    --card: 30 15% 10%;
+    --card-foreground: 40 20% 95%;
+    --popover: 30 15% 10%;
+    --popover-foreground: 40 20% 95%;
+    --primary: 27 96% 61%;
+    --primary-foreground: 30 15% 8%;
+    --secondary: 33 20% 20%;
+    --secondary-foreground: 40 20% 90%;
+    --muted: 30 15% 18%;
+    --muted-foreground: 35 15% 60%;
+    --accent: 174 60% 45%;
+    --accent-foreground: 30 15% 8%;
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 15% 20%;
+    --input: 30 15% 20%;
+    --ring: 27 96% 61%;
+
+    /* Chart colors - dark mode */
+    --chart-1: 27 96% 61%;
+    --chart-2: 174 60% 45%;
+    --chart-3: 33 45% 55%;
+    --chart-4: 142 45% 50%;
+    --chart-5: 15 55% 60%;
+
+    /* Custom trail colors - dark mode */
+    --trail-green: 142 45% 45%;
+    --trail-brown: 30 30% 45%;
+    --trail-orange: 27 96% 61%;
+    --trail-tan: 35 30% 40%;
+    --trail-cream: 40 20% 20%;
+    --trail-teal: 174 60% 45%;
+
+    /* Sidebar - dark mode */
+    --sidebar-background: 30 15% 10%;
+    --sidebar-foreground: 40 20% 95%;
+    --sidebar-primary: 27 96% 61%;
+    --sidebar-primary-foreground: 30 15% 8%;
+    --sidebar-accent: 30 15% 18%;
+    --sidebar-accent-foreground: 40 20% 95%;
+    --sidebar-border: 30 15% 20%;
+    --sidebar-ring: 27 96% 61%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
