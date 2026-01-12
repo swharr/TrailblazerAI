@@ -1,213 +1,194 @@
+// lib/cost-tracker.ts
+
+import { AnalysisMetrics, ModelName } from './types';
+
 /**
- * Cost Tracker - Monitor and manage AI API usage costs
- *
- * Tracks:
- * - Per-request costs
- * - Daily/monthly totals
- * - Budget limits and alerts
- * - Cost by provider and model
+ * Pricing per million tokens for each supported model
  */
-
-import { AIProvider } from './model-router';
-
-export interface UsageRecord {
-  id: string;
-  timestamp: Date;
-  provider: AIProvider;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  cost: number;
-  taskType: string;
-}
-
-export interface CostSummary {
-  totalCost: number;
-  byProvider: Record<AIProvider, number>;
-  byModel: Record<string, number>;
-  byTaskType: Record<string, number>;
-  requestCount: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
-
-export interface BudgetConfig {
-  monthlyLimit: number;
-  dailyLimit?: number;
-  alertThreshold: number; // Percentage (0-1) at which to alert
-}
-
-// In-memory storage for demo purposes
-// In production, this would be persisted to a database
-let usageRecords: UsageRecord[] = [];
-let budgetConfig: BudgetConfig = {
-  monthlyLimit: 50,
-  dailyLimit: 5,
-  alertThreshold: 0.8,
+export const MODEL_COSTS: Record<
+  ModelName,
+  { inputPer1M: number; outputPer1M: number }
+> = {
+  // Anthropic models
+  'claude-sonnet-4-20250514': { inputPer1M: 3.0, outputPer1M: 15.0 },
+  'claude-opus-4-20250514': { inputPer1M: 15.0, outputPer1M: 75.0 },
+  'claude-3-5-sonnet-20241022': { inputPer1M: 3.0, outputPer1M: 15.0 },
+  'claude-3-5-haiku-20241022': { inputPer1M: 0.8, outputPer1M: 4.0 },
+  // OpenAI models
+  'gpt-4o': { inputPer1M: 2.5, outputPer1M: 10.0 },
+  'gpt-4o-mini': { inputPer1M: 0.15, outputPer1M: 0.6 },
+  'gpt-4-turbo': { inputPer1M: 10.0, outputPer1M: 30.0 },
+  'o1': { inputPer1M: 15.0, outputPer1M: 60.0 },
+  'o1-mini': { inputPer1M: 3.0, outputPer1M: 12.0 },
+  // Google models
+  'gemini-2.0-flash': { inputPer1M: 0.1, outputPer1M: 0.4 },
+  'gemini-1.5-pro': { inputPer1M: 1.25, outputPer1M: 5.0 },
+  'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.3 },
+  'gemini-pro': { inputPer1M: 0.5, outputPer1M: 1.5 },
+  'gemini-pro-vision': { inputPer1M: 0.5, outputPer1M: 1.5 },
 };
 
 /**
- * Record a new API usage event
- */
-export function recordUsage(record: Omit<UsageRecord, 'id' | 'timestamp'>): UsageRecord {
-  const newRecord: UsageRecord = {
-    ...record,
-    id: crypto.randomUUID(),
-    timestamp: new Date(),
-  };
-
-  usageRecords.push(newRecord);
-
-  // Check budget alerts
-  checkBudgetAlerts();
-
-  return newRecord;
-}
-
-/**
- * Calculate cost for a request
+ * Calculate the cost of an API call in dollars
+ * @param model - The model name used
+ * @param inputTokens - Number of input tokens
+ * @param outputTokens - Number of output tokens
+ * @returns Cost in dollars
  */
 export function calculateCost(
+  model: ModelName,
   inputTokens: number,
-  outputTokens: number,
-  inputCostPer1k: number,
-  outputCostPer1k: number
+  outputTokens: number
 ): number {
-  const inputCost = (inputTokens / 1000) * inputCostPer1k;
-  const outputCost = (outputTokens / 1000) * outputCostPer1k;
+  const pricing = MODEL_COSTS[model];
+  if (!pricing) {
+    console.warn(`Unknown model: ${model}, defaulting to zero cost`);
+    return 0;
+  }
+
+  const inputCost = (inputTokens / 1_000_000) * pricing.inputPer1M;
+  const outputCost = (outputTokens / 1_000_000) * pricing.outputPer1M;
+
   return inputCost + outputCost;
 }
 
 /**
- * Get cost summary for a time period
+ * In-memory storage for metrics
  */
-export function getCostSummary(startDate?: Date, endDate?: Date): CostSummary {
-  let records = usageRecords;
+let metricsStore: AnalysisMetrics[] = [];
 
-  if (startDate) {
-    records = records.filter((r) => r.timestamp >= startDate);
-  }
-  if (endDate) {
-    records = records.filter((r) => r.timestamp <= endDate);
-  }
-
-  const summary: CostSummary = {
-    totalCost: 0,
-    byProvider: {} as Record<AIProvider, number>,
-    byModel: {},
-    byTaskType: {},
-    requestCount: records.length,
-    totalInputTokens: 0,
-    totalOutputTokens: 0,
-  };
-
-  for (const record of records) {
-    summary.totalCost += record.cost;
-    summary.totalInputTokens += record.inputTokens;
-    summary.totalOutputTokens += record.outputTokens;
-
-    summary.byProvider[record.provider] =
-      (summary.byProvider[record.provider] || 0) + record.cost;
-    summary.byModel[record.model] = (summary.byModel[record.model] || 0) + record.cost;
-    summary.byTaskType[record.taskType] =
-      (summary.byTaskType[record.taskType] || 0) + record.cost;
-  }
-
-  return summary;
+/**
+ * Add a metric to the in-memory store
+ * @param metric - The AnalysisMetrics object to track
+ */
+export function trackMetric(metric: AnalysisMetrics): void {
+  metricsStore.push(metric);
 }
 
 /**
- * Get current month's cost summary
+ * Get the start of a time period
  */
-export function getCurrentMonthCost(): CostSummary {
+function getTimeframeStart(timeframe: 'today' | 'week' | 'month'): Date {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  return getCostSummary(startOfMonth);
+
+  switch (timeframe) {
+    case 'today':
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    case 'week':
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 7);
+      weekStart.setHours(0, 0, 0, 0);
+      return weekStart;
+    case 'month':
+      const monthStart = new Date(now);
+      monthStart.setDate(now.getDate() - 30);
+      monthStart.setHours(0, 0, 0, 0);
+      return monthStart;
+  }
 }
 
 /**
- * Get today's cost summary
+ * Get metrics filtered by timeframe
+ * @param timeframe - Optional filter: 'today', 'week', or 'month'
+ * @returns Array of AnalysisMetrics matching the timeframe
  */
-export function getTodayCost(): CostSummary {
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return getCostSummary(startOfDay);
+export function getMetrics(
+  timeframe?: 'today' | 'week' | 'month'
+): AnalysisMetrics[] {
+  if (!timeframe) {
+    return [...metricsStore];
+  }
+
+  const startDate = getTimeframeStart(timeframe);
+
+  return metricsStore.filter((metric) => {
+    const metricDate = new Date(metric.timestamp);
+    return metricDate >= startDate;
+  });
 }
 
 /**
- * Check if budget limits are exceeded or approaching
+ * Aggregated metrics by model
  */
-export function checkBudgetAlerts(): {
-  monthlyExceeded: boolean;
-  dailyExceeded: boolean;
-  monthlyWarning: boolean;
-  dailyWarning: boolean;
-} {
-  const monthlySummary = getCurrentMonthCost();
-  const dailySummary = getTodayCost();
+export interface ModelMetricsSummary {
+  calls: number;
+  cost: number;
+  avgLatency: number;
+}
 
-  const monthlyExceeded = monthlySummary.totalCost >= budgetConfig.monthlyLimit;
-  const dailyExceeded = budgetConfig.dailyLimit
-    ? dailySummary.totalCost >= budgetConfig.dailyLimit
-    : false;
+/**
+ * Get metrics aggregated by model
+ * @returns Record of model names to aggregated metrics
+ */
+export function getMetricsByModel(): Record<string, ModelMetricsSummary> {
+  const byModel: Record<
+    string,
+    { calls: number; totalCost: number; totalLatency: number }
+  > = {};
 
-  const monthlyWarning =
-    monthlySummary.totalCost >= budgetConfig.monthlyLimit * budgetConfig.alertThreshold;
-  const dailyWarning = budgetConfig.dailyLimit
-    ? dailySummary.totalCost >= budgetConfig.dailyLimit * budgetConfig.alertThreshold
-    : false;
+  for (const metric of metricsStore) {
+    if (!byModel[metric.model]) {
+      byModel[metric.model] = { calls: 0, totalCost: 0, totalLatency: 0 };
+    }
 
+    byModel[metric.model].calls += 1;
+    byModel[metric.model].totalCost += metric.cost;
+    byModel[metric.model].totalLatency += metric.latency;
+  }
+
+  const result: Record<string, ModelMetricsSummary> = {};
+
+  for (const [model, data] of Object.entries(byModel)) {
+    result[model] = {
+      calls: data.calls,
+      cost: data.totalCost,
+      avgLatency: data.calls > 0 ? data.totalLatency / data.calls : 0,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Clear all stored metrics
+ */
+export function clearMetrics(): void {
+  metricsStore = [];
+}
+
+/**
+ * Format a cost value as a dollar string
+ * @param cost - Cost in dollars
+ * @returns Formatted string like "$0.0823"
+ */
+export function formatCost(cost: number): string {
+  return `$${cost.toFixed(4)}`;
+}
+
+/**
+ * Get the total cost of all tracked metrics
+ * @returns Total cost in dollars
+ */
+export function getTotalCost(): number {
+  return metricsStore.reduce((sum, metric) => sum + metric.cost, 0);
+}
+
+/**
+ * Create an AnalysisMetrics object with calculated cost
+ * Helper for creating metrics entries
+ */
+export function createMetric(
+  model: ModelName,
+  inputTokens: number,
+  outputTokens: number,
+  latency: number
+): AnalysisMetrics {
   return {
-    monthlyExceeded,
-    dailyExceeded,
-    monthlyWarning,
-    dailyWarning,
+    model,
+    inputTokens,
+    outputTokens,
+    cost: calculateCost(model, inputTokens, outputTokens),
+    latency,
+    timestamp: new Date().toISOString(),
   };
-}
-
-/**
- * Update budget configuration
- */
-export function setBudgetConfig(config: Partial<BudgetConfig>): BudgetConfig {
-  budgetConfig = { ...budgetConfig, ...config };
-  return budgetConfig;
-}
-
-/**
- * Get current budget configuration
- */
-export function getBudgetConfig(): BudgetConfig {
-  return { ...budgetConfig };
-}
-
-/**
- * Get remaining budget
- */
-export function getRemainingBudget(): {
-  monthly: number;
-  daily: number | null;
-} {
-  const monthlySummary = getCurrentMonthCost();
-  const dailySummary = getTodayCost();
-
-  return {
-    monthly: Math.max(0, budgetConfig.monthlyLimit - monthlySummary.totalCost),
-    daily: budgetConfig.dailyLimit
-      ? Math.max(0, budgetConfig.dailyLimit - dailySummary.totalCost)
-      : null,
-  };
-}
-
-/**
- * Clear usage records (for testing or reset)
- */
-export function clearUsageRecords(): void {
-  usageRecords = [];
-}
-
-/**
- * Export usage records for backup/analysis
- */
-export function exportUsageRecords(): UsageRecord[] {
-  return [...usageRecords];
 }

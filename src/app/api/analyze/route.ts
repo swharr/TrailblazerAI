@@ -1,36 +1,469 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { ApiResponse, PhotoAnalysis } from '@/lib/types';
+import type {
+  ApiResponse,
+  AnalysisResult,
+  TrailAnalysis,
+  AnalysisMetrics,
+  ModelName,
+  VehicleInfo,
+  AnalysisContext,
+} from '@/lib/types';
+import AnthropicClient from '@/lib/model-clients/anthropic';
+import { buildAnalysisPrompt } from '@/lib/prompts';
+import { trackMetric, calculateCost } from '@/lib/cost-tracker';
+import { ModelError, RateLimitError } from '@/lib/model-clients/base';
 
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<PhotoAnalysis>>> {
+/** Supported models for image analysis */
+const SUPPORTED_VISION_MODELS: ModelName[] = [
+  'claude-sonnet-4-20250514',
+  'claude-opus-4-20250514',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-5-haiku-20241022',
+];
+
+/** Maximum file size per image (5MB - Anthropic API limit) */
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+/** Maximum number of images */
+const MAX_IMAGES = 4;
+
+/** Allowed image MIME types */
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+/**
+ * Convert a File to base64 data URL
+ */
+async function fileToBase64(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64 = btoa(binary);
+  return `data:${file.type};base64,${base64}`;
+}
+
+/**
+ * Parse JSON from AI response text, handling potential formatting issues
+ */
+function parseAnalysisJson(text: string): TrailAnalysis {
+  // Try to extract JSON from the response
+  let jsonStr = text.trim();
+
+  // Remove markdown code blocks if present
+  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1].trim();
+  }
+
+  // Try to find JSON object in the response
+  const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
+  if (objectMatch) {
+    jsonStr = objectMatch[0];
+  }
+
+  const parsed = JSON.parse(jsonStr);
+
+  // Validate required fields and provide defaults
+  const analysis: TrailAnalysis = {
+    difficulty: typeof parsed.difficulty === 'number' ? parsed.difficulty : 3,
+    trailType: Array.isArray(parsed.trailType) ? parsed.trailType : [],
+    conditions: Array.isArray(parsed.conditions) ? parsed.conditions : [],
+    hazards: Array.isArray(parsed.hazards) ? parsed.hazards : [],
+    recommendations: Array.isArray(parsed.recommendations)
+      ? parsed.recommendations
+      : [],
+    bestFor: Array.isArray(parsed.bestFor) ? parsed.bestFor : [],
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+    rawResponse: text,
+  };
+
+  // Parse vehicle settings if present
+  if (parsed.vehicleSettings) {
+    analysis.vehicleSettings = {
+      transferCase: parsed.vehicleSettings.transferCase || '4H',
+      tractionControl: parsed.vehicleSettings.tractionControl || 'on',
+      additionalNotes: Array.isArray(parsed.vehicleSettings.additionalNotes)
+        ? parsed.vehicleSettings.additionalNotes
+        : [],
+    };
+
+    if (parsed.vehicleSettings.recommendedTirePressure) {
+      analysis.vehicleSettings.recommendedTirePressure = {
+        front: parsed.vehicleSettings.recommendedTirePressure.front || 30,
+        rear: parsed.vehicleSettings.recommendedTirePressure.rear || 30,
+        unit: 'psi',
+      };
+    }
+
+    if (Array.isArray(parsed.vehicleSettings.lockers)) {
+      analysis.vehicleSettings.lockers = parsed.vehicleSettings.lockers;
+    }
+  }
+
+  // Parse fuel estimate if present
+  if (parsed.fuelEstimate) {
+    analysis.fuelEstimate = {
+      bestCase: parsed.fuelEstimate.bestCase || 'Unknown',
+      worstCase: parsed.fuelEstimate.worstCase || 'Unknown',
+      notes: parsed.fuelEstimate.notes,
+    };
+  }
+
+  // Parse emergency comms if present
+  if (parsed.emergencyComms) {
+    const validCoverage = ['none', 'limited', 'moderate', 'good'];
+    analysis.emergencyComms = {
+      cellCoverage: validCoverage.includes(parsed.emergencyComms.cellCoverage)
+        ? parsed.emergencyComms.cellCoverage
+        : 'limited',
+      recommendedMethods: Array.isArray(parsed.emergencyComms.recommendedMethods)
+        ? parsed.emergencyComms.recommendedMethods
+        : [],
+      notes: parsed.emergencyComms.notes,
+    };
+  }
+
+  return analysis;
+}
+
+/**
+ * Create CORS headers for the response
+ */
+function getCorsHeaders(): HeadersInit {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(),
+  });
+}
+
+/**
+ * POST /api/analyze
+ * Analyze a trail image using AI vision models
+ *
+ * Request: FormData with:
+ *   - image: File (required) - The trail image to analyze
+ *   - model: string (required) - The model to use for analysis
+ *
+ * Response: AnalysisResult with analysis and metrics
+ */
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<AnalysisResult>>> {
+  const startTime = Date.now();
+
+  console.log('[analyze] Received analysis request');
+
   try {
+    // Parse FormData
     const formData = await request.formData();
-    const image = formData.get('image') as File | null;
+    const images = formData.getAll('images') as File[];
+    const modelParam = formData.get('model') as string | null;
+    const vehicleInfoParam = formData.get('vehicleInfo') as string | null;
+    const contextParam = formData.get('context') as string | null;
 
-    if (!image) {
+    // Parse optional vehicle info and context
+    let vehicleInfo: VehicleInfo | null = null;
+    let context: AnalysisContext | null = null;
+
+    if (vehicleInfoParam) {
+      try {
+        vehicleInfo = JSON.parse(vehicleInfoParam) as VehicleInfo;
+      } catch {
+        console.warn('[analyze] Failed to parse vehicleInfo');
+      }
+    }
+
+    if (contextParam) {
+      try {
+        context = JSON.parse(contextParam) as AnalysisContext;
+      } catch {
+        console.warn('[analyze] Failed to parse context');
+      }
+    }
+
+    console.log('[analyze] FormData parsed:', {
+      imageCount: images.length,
+      imageTypes: images.map((img) => img.type),
+      imageSizes: images.map((img) => img.size),
+      model: modelParam,
+      hasVehicleInfo: !!vehicleInfo,
+      hasContext: !!context,
+    });
+
+    // Validate images
+    if (!images || images.length === 0) {
+      console.log('[analyze] Error: No images provided');
       return NextResponse.json(
-        { success: false, error: 'No image provided' },
-        { status: 400 }
+        { success: false, error: 'No images provided' },
+        { status: 400, headers: getCorsHeaders() }
       );
     }
 
-    // TODO: Implement actual AI analysis using configured API
-    // This is a placeholder response
-    const analysis: PhotoAnalysis = {
-      id: crypto.randomUUID(),
-      imageUrl: '', // Would be stored/processed URL
-      analyzedAt: new Date(),
-      terrainConditions: [],
-      obstacles: [],
-      recommendations: ['Analysis API not yet configured'],
-      confidence: 0,
+    // Validate image count
+    if (images.length > MAX_IMAGES) {
+      console.log('[analyze] Error: Too many images:', images.length);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many images (${images.length}). Maximum is ${MAX_IMAGES}.`,
+        },
+        { status: 400, headers: getCorsHeaders() }
+      );
+    }
+
+    // Validate each image
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i];
+
+      // Validate file type
+      if (!ALLOWED_MIME_TYPES.includes(image.type)) {
+        console.log('[analyze] Error: Invalid file type for image', i + 1, ':', image.type);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Invalid file type for image ${i + 1}: ${image.type}. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+          },
+          { status: 400, headers: getCorsHeaders() }
+        );
+      }
+
+      // Validate file size
+      if (image.size > MAX_FILE_SIZE) {
+        const sizeMB = (image.size / (1024 * 1024)).toFixed(1);
+        console.log('[analyze] Error: Image', i + 1, 'too large:', sizeMB, 'MB');
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Image ${i + 1} is too large (${sizeMB}MB). Maximum size is 5MB per image.`,
+          },
+          { status: 400, headers: getCorsHeaders() }
+        );
+      }
+    }
+
+    // Validate model parameter
+    if (!modelParam) {
+      console.log('[analyze] Error: No model specified');
+      return NextResponse.json(
+        { success: false, error: 'No model specified' },
+        { status: 400, headers: getCorsHeaders() }
+      );
+    }
+
+    const model = modelParam as ModelName;
+
+    // Check if model is supported for vision
+    if (!SUPPORTED_VISION_MODELS.includes(model)) {
+      // Check if it's a known model but doesn't support vision
+      const nonVisionModels: ModelName[] = ['gemini-pro'];
+      if (nonVisionModels.includes(model)) {
+        console.log('[analyze] Error: Model does not support vision:', model);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Model ${model} does not support image analysis`,
+          },
+          { status: 400, headers: getCorsHeaders() }
+        );
+      }
+
+      // Check if it's a model we haven't implemented yet
+      const notImplementedModels: ModelName[] = [
+        'gpt-4o',
+        'gpt-4-turbo',
+        'gemini-pro-vision',
+      ];
+      if (notImplementedModels.includes(model)) {
+        console.log('[analyze] Error: Model not yet implemented:', model);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Model ${model} is not yet implemented. Currently supported: ${SUPPORTED_VISION_MODELS.join(', ')}`,
+          },
+          { status: 501, headers: getCorsHeaders() }
+        );
+      }
+
+      console.log('[analyze] Error: Unknown model:', model);
+      return NextResponse.json(
+        { success: false, error: `Unknown model: ${model}` },
+        { status: 400, headers: getCorsHeaders() }
+      );
+    }
+
+    // Convert all images to base64
+    console.log('[analyze] Converting', images.length, 'image(s) to base64...');
+    const base64Images = await Promise.all(images.map((img) => fileToBase64(img)));
+    console.log('[analyze] Base64 conversion complete, total length:', base64Images.reduce((sum, b64) => sum + b64.length, 0));
+
+    // Create appropriate client based on model
+    console.log('[analyze] Creating client for model:', model);
+    let response;
+
+    // Check if model is an Anthropic model
+    const isAnthropicModel =
+      model === 'claude-sonnet-4-20250514' ||
+      model === 'claude-opus-4-20250514' ||
+      model === 'claude-3-5-sonnet-20241022' ||
+      model === 'claude-3-5-haiku-20241022';
+
+    if (isAnthropicModel) {
+      const client = new AnthropicClient();
+      const prompt = buildAnalysisPrompt(vehicleInfo, context);
+      console.log('[analyze] Calling Anthropic API with', base64Images.length, 'image(s)...');
+      response = await client.analyzeImages(base64Images, prompt);
+    } else {
+      // This shouldn't happen due to earlier validation, but just in case
+      return NextResponse.json(
+        { success: false, error: 'Model not yet implemented' },
+        { status: 501, headers: getCorsHeaders() }
+      );
+    }
+
+    const latency = Date.now() - startTime;
+    console.log('[analyze] API response received:', {
+      textLength: response.text.length,
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+      latency,
+    });
+
+    // Parse the AI response as JSON
+    console.log('[analyze] Parsing AI response as JSON...');
+    let analysis: TrailAnalysis;
+    try {
+      analysis = parseAnalysisJson(response.text);
+      console.log('[analyze] Parsed analysis:', {
+        difficulty: analysis.difficulty,
+        trailTypes: analysis.trailType.length,
+        hazards: analysis.hazards.length,
+      });
+    } catch (parseError) {
+      console.error('[analyze] Failed to parse AI response as JSON:', parseError);
+      console.error('[analyze] Raw response:', response.text.substring(0, 500));
+
+      // Return partial result with raw response
+      analysis = {
+        difficulty: 0,
+        trailType: [],
+        conditions: [],
+        hazards: [],
+        recommendations: [],
+        bestFor: [],
+        summary: 'Failed to parse structured analysis',
+        rawResponse: response.text,
+      };
+    }
+
+    // Calculate cost and create metrics
+    const cost = calculateCost(
+      model,
+      response.usage.inputTokens,
+      response.usage.outputTokens
+    );
+
+    const metrics: AnalysisMetrics = {
+      model,
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+      cost,
+      latency,
+      timestamp: new Date().toISOString(),
     };
 
-    return NextResponse.json({ success: true, data: analysis });
-  } catch (error) {
-    console.error('Analysis error:', error);
+    // Track the metrics
+    trackMetric(metrics);
+    console.log('[analyze] Metrics tracked:', {
+      model: metrics.model,
+      cost: `$${cost.toFixed(4)}`,
+      latency: `${latency}ms`,
+    });
+
+    // Build the result
+    const result: AnalysisResult = {
+      analysis,
+      metrics,
+    };
+
+    console.log('[analyze] Analysis complete, returning result');
+
     return NextResponse.json(
-      { success: false, error: 'Failed to analyze image' },
-      { status: 500 }
+      { success: true, data: result },
+      { status: 200, headers: getCorsHeaders() }
+    );
+  } catch (error) {
+    console.error('[analyze] Error during analysis:', error);
+
+    // Handle specific error types
+    if (error instanceof RateLimitError) {
+      console.error('[analyze] Rate limit exceeded');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+        },
+        {
+          status: 429,
+          headers: {
+            ...getCorsHeaders(),
+            'Retry-After': error.retryAfterMs
+              ? String(Math.ceil(error.retryAfterMs / 1000))
+              : '60',
+          },
+        }
+      );
+    }
+
+    if (error instanceof ModelError) {
+      console.error('[analyze] Model error:', error.message, 'Status:', error.statusCode);
+
+      // Map status codes
+      const status = error.statusCode || 500;
+      if (status === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'API key configuration error. Please contact support.',
+          },
+          { status: 500, headers: getCorsHeaders() }
+        );
+      }
+
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status, headers: getCorsHeaders() }
+      );
+    }
+
+    // Generic error
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('[analyze] Unexpected error:', errorMessage);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to analyze image. Please try again.',
+      },
+      { status: 500, headers: getCorsHeaders() }
     );
   }
 }

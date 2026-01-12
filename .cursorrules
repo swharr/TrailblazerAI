@@ -1,0 +1,46 @@
+# TrailBlazer AI - Cursor Rules
+
+## Code Style
+- Use TypeScript with strict type checking
+- Functional components with hooks (no class components)
+- Use "use client" directive only when necessary (prefer server components)
+- Async/await over promises
+- Descriptive variable names (no single letters except loop counters)
+
+## React Patterns
+- Co-locate related components
+- Extract reusable logic into custom hooks
+- Use React Server Components by default
+- Client components only for interactivity
+- Proper loading and error states for all async operations
+
+## Styling
+- Tailwind utility classes (avoid custom CSS unless necessary)
+- Mobile-first responsive design
+- Use shadcn/ui components as base
+- Consistent spacing (use Tailwind's scale: 4, 8, 16, 24, 32)
+- Dark mode consideration in all components
+
+## API Integration
+- All API calls go through /app/api routes (no direct client calls to external APIs)
+- Type all API responses
+- Error handling with user-friendly messages
+- Loading states for all async operations
+- Cost tracking on every model API call
+
+## File Organization
+- One component per file
+- Export component as default
+- Types defined in same file or /lib/types.ts if shared
+- Utils in /lib/utils.ts
+
+## Comments
+- JSDoc for complex functions
+- Inline comments for non-obvious logic only
+- No commented-out code (use git history)
+
+## Performance
+- Lazy load heavy components
+- Optimize images (use Next.js Image component)
+- Memoize expensive calculations
+- Debounce user input for API calls
