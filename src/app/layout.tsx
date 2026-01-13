@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { Sidebar } from '@/components/navigation/sidebar';
 import { ThemeProvider } from '@/components/theme-provider';
+import SessionProvider from '@/components/auth/SessionProvider';
 
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
@@ -29,17 +30,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <Sidebar />
-          <main className="min-h-screen md:pl-64">
-            <div className="pt-16 md:pt-0">{children}</div>
-          </main>
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <Sidebar />
+            <main className="min-h-screen md:pl-64">
+              <div className="pt-16 md:pt-0">{children}</div>
+            </main>
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

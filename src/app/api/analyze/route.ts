@@ -135,12 +135,15 @@ function parseAnalysisJson(text: string): TrailAnalysis {
 
 /**
  * Create CORS headers for the response
+ * Restricts origins to allowed domains only
  */
 function getCorsHeaders(): HeadersInit {
+  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3636';
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
   };
 }
 

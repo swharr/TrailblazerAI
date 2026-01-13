@@ -1,0 +1,157 @@
+// TrailBlazer AI - Database Schema
+// PostgreSQL with Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// NextAuth.js Models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?   // For credentials auth
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  authenticators Authenticator[] // WebAuthn/Passkeys
+  vehicles       VehicleProfile[]
+  analyses       TrailAnalysis[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// WebAuthn/Passkey credentials
+model Authenticator {
+  id                   String  @id @default(cuid())
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, credentialID])
+}
+
+// TrailBlazer AI Models
+model VehicleProfile {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name             String?  // Optional nickname like "My Tacoma"
+  make             String
+  model            String
+  year             Int?
+  features         String[] // PostgreSQL array: lift-kit, all-terrain-tires, etc.
+  suspensionBrand  String?
+  suspensionTravel String?
+  isDefault        Boolean  @default(false)
+
+  analyses         TrailAnalysis[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model TrailAnalysis {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Optional vehicle used for analysis
+  vehicleId       String?
+  vehicle         VehicleProfile? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  // Trail context
+  trailName       String?
+  trailLocation   String?
+  notes           String?  @db.Text
+
+  // Analysis results
+  difficulty      Int      // 1-5
+  trailType       String[]
+  conditions      String[]
+  hazards         String[]
+  recommendations String[]
+  bestFor         String[]
+  summary         String   @db.Text
+  rawResponse     String   @db.Text
+
+  // Optional AI-generated recommendations (stored as JSON)
+  vehicleSettings Json?
+  fuelEstimate    Json?
+  emergencyComms  Json?
+
+  // Relation to metrics
+  metrics         AnalysisMetrics?
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AnalysisMetrics {
+  id           String        @id @default(cuid())
+  analysisId   String        @unique
+  analysis     TrailAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  model        String        // AI model used
+  inputTokens  Int
+  outputTokens Int
+  cost         Decimal       @db.Decimal(10, 6)
+  latencyMs    Int
+
+  createdAt    DateTime      @default(now())
+}

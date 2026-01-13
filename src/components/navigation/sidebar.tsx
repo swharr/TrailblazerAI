@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { ModeToggle } from '@/components/mode-toggle';
+import UserMenu from '@/components/auth/UserMenu';
 import { useState } from 'react';
 
 const navItems = [
@@ -89,6 +90,13 @@ export function Sidebar() {
             <div className="flex-1 px-4 py-4">
               <NavLinks onNavigate={() => setOpen(false)} />
             </div>
+            <div className="px-4 py-4">
+              <Separator className="mb-4" />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">v0.1.0</p>
+                <UserMenu />
+              </div>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
@@ -108,9 +116,10 @@ export function Sidebar() {
         </div>
         <div className="px-4 py-4">
           <Separator className="mb-4" />
-          <p className="text-xs text-muted-foreground text-center">
-            TrailBlazer AI v0.1.0
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">v0.1.0</p>
+            <UserMenu />
+          </div>
         </div>
       </aside>
     </>
