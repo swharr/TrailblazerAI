@@ -1,6 +1,6 @@
 # TrailBlazer AI - Session State
 
-> Last updated: 2026-01-12
+> Last updated: 2026-01-13
 > Session: Database + Auth + Security Implementation
 
 ## Current Progress
@@ -10,21 +10,36 @@
 - [x] Pushed to GitHub: https://github.com/swharr/TrailblazerAI
 - [x] Dependencies installed: prisma, @prisma/client, next-auth@beta, @auth/prisma-adapter, bcryptjs, @prisma/adapter-pg, pg
 - [x] Created `docker-compose.yml` for PostgreSQL (port 5433)
-- [x] Created Prisma schema with all models
+- [x] Created Prisma schema with all models (including WebAuthn Authenticator)
 - [x] Configured environment variables (.env, .env.local)
 - [x] PostgreSQL running via Docker (`trailblazer-db` container)
-- [x] Prisma migrations applied (`20260113055449_init`)
+- [x] Prisma migrations applied (init + webauthn)
 - [x] NextAuth v5 configured with Prisma adapter
 - [x] Auth components created (SignInForm, SignUpForm, UserMenu)
 - [x] Auth pages created (/auth/signin, /auth/signup)
 - [x] Registration API created (/api/auth/register)
 - [x] SessionProvider added to layout
 - [x] UserMenu added to sidebar (mobile + desktop)
+- [x] **Security hardening applied:**
+  - Strong password requirements (12+ chars, upper/lower/number/special)
+  - CORS restricted to app domain only
+  - Security headers in next.config.mjs
+  - Generated strong NEXTAUTH_SECRET
+- [x] **OAuth & Passkeys configured:**
+  - Google OAuth provider (needs credentials)
+  - Apple OAuth provider (needs credentials)
+  - WebAuthn/Passkey provider (experimental)
+- [x] **Auth middleware:**
+  - Edge-compatible middleware using `getToken` for protected pages
+  - API routes use `requireAuth()` helper for auth checks
+  - /api/analyze now requires authentication
 
 ### In Progress
 - [ ] Nothing currently in progress
 
 ### Pending
+- [ ] Set up Google OAuth credentials (console.cloud.google.com)
+- [ ] Set up Apple OAuth credentials (developer.apple.com)
 - [ ] Create API routes:
   - [ ] `/api/analyses` - GET user's analysis history, POST save analysis
   - [ ] `/api/vehicles` - CRUD for vehicle profiles
@@ -39,6 +54,7 @@
 User (NextAuth)
 ├── Account (OAuth)
 ├── Session
+├── Authenticator (WebAuthn/Passkeys)
 ├── VehicleProfile (1:many)
 └── TrailAnalysis (1:many)
     └── AnalysisMetrics (1:1)
@@ -53,13 +69,15 @@ User (NextAuth)
 | `prisma.config.ts` | Prisma configuration |
 | `prisma/migrations/` | Database migrations |
 | `src/lib/db.ts` | Prisma client singleton with pg adapter |
-| `src/lib/auth.ts` | NextAuth configuration |
+| `src/lib/auth.ts` | NextAuth configuration (credentials + OAuth + passkeys) |
+| `src/lib/api-auth.ts` | Auth helpers for API routes (requireAuth) |
+| `src/middleware.ts` | Edge-compatible auth middleware for pages |
 | `src/app/api/auth/[...nextauth]/route.ts` | NextAuth API |
 | `src/app/api/auth/register/route.ts` | User registration API |
 | `src/app/auth/signin/page.tsx` | Sign in page |
 | `src/app/auth/signup/page.tsx` | Sign up page |
-| `src/components/auth/SignInForm.tsx` | Sign in form |
-| `src/components/auth/SignUpForm.tsx` | Sign up form |
+| `src/components/auth/SignInForm.tsx` | Sign in form (OAuth + Passkey buttons) |
+| `src/components/auth/SignUpForm.tsx` | Sign up form with password requirements |
 | `src/components/auth/UserMenu.tsx` | User dropdown menu |
 | `src/components/auth/SessionProvider.tsx` | NextAuth session wrapper |
 
@@ -69,19 +87,36 @@ User (NextAuth)
 |------|---------|
 | `.env` | DATABASE_URL |
 | `.env.local` | DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL |
+| `.env.example` | OAuth env var placeholders |
 | `package.json` | Added all new dependencies |
+| `next.config.mjs` | Security headers |
 | `src/app/layout.tsx` | Added SessionProvider |
+| `src/app/api/analyze/route.ts` | Added auth check, restricted CORS |
 | `src/components/navigation/sidebar.tsx` | Added UserMenu |
 
 ## Environment Variables Required
 
 ```bash
-# Already configured in .env.local
+# Core (already configured)
 ANTHROPIC_API_KEY=xxx
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/trailblazer?schema=public"
-NEXTAUTH_SECRET="trailblazer-dev-secret-change-in-production"
+NEXTAUTH_SECRET="<strong-secret>"  # Generated with openssl rand -base64 32
 NEXTAUTH_URL="http://localhost:3636"
+
+# OAuth (need to configure)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+APPLE_CLIENT_ID=
+APPLE_CLIENT_SECRET=
 ```
+
+## Auth Test Results
+
+| Endpoint | Expected | Actual |
+|----------|----------|--------|
+| GET /api/health | 200 OK | Pass |
+| POST /api/analyze (no auth) | 401 | Pass |
+| GET /dashboard (no auth) | 307 -> /auth/signin | Pass |
 
 ## Commands to Resume
 
@@ -104,8 +139,13 @@ npx prisma studio
 
 - **Database**: PostgreSQL 16 (Docker, port 5433)
 - **ORM**: Prisma 7 with @prisma/adapter-pg
-- **Auth**: NextAuth.js v5 (beta) with credentials provider
-- **Password hashing**: bcryptjs
+- **Auth**: NextAuth.js v5 (beta) with:
+  - Credentials provider (email/password)
+  - Google OAuth (needs config)
+  - Apple OAuth (needs config)
+  - Passkey/WebAuthn (experimental)
+- **Password hashing**: bcryptjs (14 rounds)
+- **Validation**: Zod
 
 ## Notes
 
@@ -113,3 +153,5 @@ npx prisma studio
 - PostgreSQL runs on port 5433 (5432 was in use by another project)
 - Prisma 7 requires the adapter pattern (no URL in schema.prisma)
 - Build passes successfully with all new components
+- Edge-compatible middleware uses `getToken` from next-auth/jwt
+- API routes use `requireAuth()` from `@/lib/api-auth`

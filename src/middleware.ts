@@ -1,26 +1,29 @@
-import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-// Routes that require authentication
-const protectedApiRoutes = ['/api/analyze', '/api/analyses', '/api/vehicles'];
+// Routes that require authentication (pages only - API routes check auth internally)
+const protectedPages = ['/dashboard', '/settings'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if this is a protected API route
-  const isProtectedApi = protectedApiRoutes.some((route) =>
+  // Check if this is a protected page
+  const isProtectedPage = protectedPages.some((route) =>
     pathname.startsWith(route)
   );
 
-  if (isProtectedApi) {
-    const session = await auth();
+  if (isProtectedPage) {
+    // Use getToken which is Edge-compatible (reads JWT from cookie)
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      );
+    if (!token) {
+      const signInUrl = new URL('/auth/signin', request.url);
+      signInUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(signInUrl);
     }
   }
 
@@ -29,9 +32,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match API routes that need protection
-    '/api/analyze/:path*',
-    '/api/analyses/:path*',
-    '/api/vehicles/:path*',
+    // Match pages that need protection (not API routes)
+    '/dashboard/:path*',
+    '/settings/:path*',
   ],
 };

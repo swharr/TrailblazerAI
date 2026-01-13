@@ -12,6 +12,7 @@ import AnthropicClient from '@/lib/model-clients/anthropic';
 import { buildAnalysisPrompt } from '@/lib/prompts';
 import { trackMetric, calculateCost } from '@/lib/cost-tracker';
 import { ModelError, RateLimitError } from '@/lib/model-clients/base';
+import { requireAuth } from '@/lib/api-auth';
 
 /** Supported models for image analysis */
 const SUPPORTED_VISION_MODELS: ModelName[] = [
@@ -173,6 +174,14 @@ export async function POST(
   const startTime = Date.now();
 
   console.log('[analyze] Received analysis request');
+
+  // Check authentication
+  const { session, errorResponse } = await requireAuth();
+  if (errorResponse) {
+    console.log('[analyze] Authentication required');
+    return errorResponse;
+  }
+  console.log('[analyze] Authenticated user:', session.user?.email);
 
   try {
     // Parse FormData
