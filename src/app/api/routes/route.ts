@@ -11,7 +11,54 @@ export interface RouteWaypoint {
   type?: 'start' | 'end' | 'waypoint' | 'campsite' | 'water' | 'fuel' | 'hazard' | 'viewpoint';
 }
 
-// GET - List user's routes
+/**
+ * @swagger
+ * /api/routes:
+ *   get:
+ *     tags:
+ *       - Routes
+ *     summary: List user's routes
+ *     description: Get all planned routes for the authenticated user with pagination
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [draft, planned, completed]
+ *         description: Filter by route status
+ *     responses:
+ *       200:
+ *         description: List of routes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 routes:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/PlannedRoute'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         description: Unauthorized
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -80,7 +127,74 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new route
+/**
+ * @swagger
+ * /api/routes:
+ *   post:
+ *     tags:
+ *       - Routes
+ *     summary: Create a new route
+ *     description: Create a new planned route with waypoints
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - waypoints
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Route name
+ *               description:
+ *                 type: string
+ *                 description: Route description
+ *               waypoints:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - lat
+ *                     - lng
+ *                   properties:
+ *                     lat:
+ *                       type: number
+ *                     lng:
+ *                       type: number
+ *                     elevation:
+ *                       type: number
+ *                     name:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                       enum: [start, end, waypoint, campsite, water, fuel, hazard, viewpoint]
+ *               totalDistance:
+ *                 type: number
+ *               estimatedTime:
+ *                 type: number
+ *               elevationGain:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Route created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 route:
+ *                   $ref: '#/components/schemas/PlannedRoute'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();

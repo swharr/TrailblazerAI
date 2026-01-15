@@ -15,6 +15,7 @@ import { ModelError, RateLimitError } from '@/lib/model-clients/base';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
+import { trackAnthropicUsage } from '@/lib/payi-client';
 
 /** Supported models for image analysis */
 const SUPPORTED_VISION_MODELS: ModelName[] = [
@@ -161,14 +162,80 @@ export async function OPTIONS(): Promise<NextResponse> {
 }
 
 /**
- * POST /api/analyze
- * Analyze a trail image using AI vision models
- *
- * Request: FormData with:
- *   - image: File (required) - The trail image to analyze
- *   - model: string (required) - The model to use for analysis
- *
- * Response: AnalysisResult with analysis and metrics
+ * @swagger
+ * /api/analyze:
+ *   post:
+ *     tags:
+ *       - Analysis
+ *     summary: Analyze trail photos
+ *     description: Upload trail photos for AI-powered terrain analysis. Returns difficulty rating, hazards, vehicle recommendations, and more.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - images
+ *               - model
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Trail images (1-4, max 5MB each)
+ *               model:
+ *                 type: string
+ *                 enum: [claude-sonnet-4-20250514, claude-opus-4-20250514, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022]
+ *                 description: AI model to use for analysis
+ *               vehicleInfo:
+ *                 type: string
+ *                 description: JSON string containing vehicle configuration
+ *               context:
+ *                 type: string
+ *                 description: JSON string containing trail context (name, location, notes)
+ *     responses:
+ *       200:
+ *         description: Analysis completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     analysis:
+ *                       $ref: '#/components/schemas/TrailAnalysis'
+ *                     metrics:
+ *                       type: object
+ *                       properties:
+ *                         model:
+ *                           type: string
+ *                         inputTokens:
+ *                           type: integer
+ *                         outputTokens:
+ *                           type: integer
+ *                         cost:
+ *                           type: number
+ *                         latency:
+ *                           type: integer
+ *                     id:
+ *                       type: string
+ *                       description: Database ID if saved
+ *       400:
+ *         description: Validation error (no images, invalid file type, etc.)
+ *       401:
+ *         description: Unauthorized
+ *       429:
+ *         description: Rate limit exceeded
+ *       500:
+ *         description: Server error
  */
 export async function POST(
   request: NextRequest
@@ -409,6 +476,16 @@ export async function POST(
       model: metrics.model,
       cost: `$${cost.toFixed(4)}`,
       latency: `${latency}ms`,
+    });
+
+    // Track usage with Pay-i (fire and forget)
+    trackAnthropicUsage({
+      model,
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+      latencyMs: latency,
+      userId: session.user?.email || undefined,
+      useCaseName: 'trail_analysis',
     });
 
     // Save analysis to database

@@ -107,8 +107,15 @@ Optional:
 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET    # Google OAuth
 APPLE_CLIENT_ID, APPLE_CLIENT_SECRET      # Apple OAuth
 MAPBOX_ACCESS_TOKEN                       # Maps
-
+PAYI_BASE_URL                             # Pay-i API base URL (e.g., https://your-app.pay-i.com)
+PAYI_API_KEY                              # Pay-i API key for usage tracking
 ```
+
+## API Documentation
+
+Swagger/OpenAPI documentation is available at `/api-docs` when running the development server.
+
+API routes are documented with JSDoc annotations that generate the OpenAPI spec.
 
 ## Session State
 

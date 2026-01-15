@@ -4,6 +4,59 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 
 // Validation schema with strong password requirements
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: Register a new user
+ *     description: Create a new user account with email and password
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 maxLength: 100
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 description: Must contain uppercase, lowercase, and number
+ *     responses:
+ *       201:
+ *         description: Account created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 const registerSchema = z.object({
   name: z
     .string()

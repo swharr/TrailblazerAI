@@ -2,7 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
-// GET - List user's vehicles
+/**
+ * @swagger
+ * /api/vehicles:
+ *   get:
+ *     tags:
+ *       - Vehicles
+ *     summary: List user's vehicles
+ *     description: Get all vehicle profiles for the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of vehicles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 vehicles:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Vehicle'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 export async function GET() {
   try {
     const session = await auth();
@@ -31,7 +61,61 @@ export async function GET() {
   }
 }
 
-// POST - Create new vehicle
+/**
+ * @swagger
+ * /api/vehicles:
+ *   post:
+ *     tags:
+ *       - Vehicles
+ *     summary: Create a new vehicle
+ *     description: Add a new vehicle profile for the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - make
+ *               - model
+ *             properties:
+ *               name:
+ *                 type: string
+ *               make:
+ *                 type: string
+ *               model:
+ *                 type: string
+ *               year:
+ *                 type: integer
+ *               features:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               suspensionBrand:
+ *                 type: string
+ *               suspensionTravel:
+ *                 type: string
+ *               isDefault:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Vehicle created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 vehicle:
+ *                   $ref: '#/components/schemas/Vehicle'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
