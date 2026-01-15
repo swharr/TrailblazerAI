@@ -139,27 +139,27 @@ export default function SampleAnalysisPage() {
     bestFor: analysisData.bestFor,
     summary: analysisData.summary,
     rawResponse: '', // Not displayed in demo
-    vehicleSettings: analysisData.vehicleSettings as TrailAnalysis['vehicleSettings'],
-    fuelEstimate: analysisData.fuelEstimate as TrailAnalysis['fuelEstimate'],
-    emergencyComms: analysisData.emergencyComms as TrailAnalysis['emergencyComms'],
+    vehicleSettings: analysisData.vehicleSettings as unknown as TrailAnalysis['vehicleSettings'],
+    fuelEstimate: analysisData.fuelEstimate as unknown as TrailAnalysis['fuelEstimate'],
+    emergencyComms: analysisData.emergencyComms as unknown as TrailAnalysis['emergencyComms'],
   };
 
   const metrics: AnalysisMetrics = analysisData.metrics
     ? {
-        model: analysisData.metrics.model,
+        model: analysisData.metrics.model as AnalysisMetrics['model'],
         inputTokens: analysisData.metrics.inputTokens,
         outputTokens: analysisData.metrics.outputTokens,
-        totalTokens: analysisData.metrics.inputTokens + analysisData.metrics.outputTokens,
         cost: 0, // Not shown in demo
-        latencyMs: analysisData.metrics.latencyMs,
+        latency: analysisData.metrics.latencyMs,
+        timestamp: new Date().toISOString(),
       }
     : {
-        model: 'claude-sonnet-4',
+        model: 'claude-sonnet-4-20250514' as AnalysisMetrics['model'],
         inputTokens: 0,
         outputTokens: 0,
-        totalTokens: 0,
         cost: 0,
-        latencyMs: 0,
+        latency: 0,
+        timestamp: new Date().toISOString(),
       };
 
   const vehicleInfo: VehicleInfo | null = analysisData.vehicle
@@ -168,9 +168,9 @@ export default function SampleAnalysisPage() {
         make: analysisData.vehicle.make,
         model: analysisData.vehicle.model,
         year: analysisData.vehicle.year || undefined,
-        features: analysisData.vehicle.features as VehicleInfo['features'],
-        suspensionBrand: analysisData.vehicle.suspensionBrand as VehicleInfo['suspensionBrand'],
-        suspensionTravel: analysisData.vehicle.suspensionTravel as VehicleInfo['suspensionTravel'],
+        features: (analysisData.vehicle.features || []) as VehicleInfo['features'],
+        suspensionBrand: (analysisData.vehicle.suspensionBrand || undefined) as VehicleInfo['suspensionBrand'],
+        suspensionTravel: (analysisData.vehicle.suspensionTravel || undefined) as VehicleInfo['suspensionTravel'],
       }
     : null;
 
