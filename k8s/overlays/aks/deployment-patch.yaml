@@ -12,12 +12,13 @@ spec:
           operator: "Equal"
           value: "spot"
           effect: "NoSchedule"
-      # Prefer spot nodes over system nodes
+      # Prefer spot nodes, but fall back to system nodes if spot unavailable
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
                   - key: kubernetes.azure.com/scalesetpriority
                     operator: In
                     values:
