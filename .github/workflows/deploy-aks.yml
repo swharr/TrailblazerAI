@@ -15,6 +15,9 @@ on:
           - production
           - staging
 
+permissions:
+  contents: read
+
 env:
   ACR_NAME: trailblazeraicr
   ACR_LOGIN_SERVER: trailblazeraicr.azurecr.io
