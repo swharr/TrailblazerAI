@@ -614,6 +614,8 @@ export interface PayiProxyConfig {
 export interface PayiProxyAnalyzeRequest {
   images: string[];
   model: string;
+  /** Full analysis prompt - proxy will use this directly */
+  prompt: string;
   vehicle_info?: {
     make: string;
     model: string;

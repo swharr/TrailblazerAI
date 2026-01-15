@@ -194,8 +194,13 @@ async def analyze(
     """
     logger.info(f"Received analysis request: {len(request.images)} images, model={request.model}")
 
-    # Build the analysis prompt (simplified - full prompt in Next.js app)
-    prompt = build_analysis_prompt(request)
+    # Use provided prompt or build a basic one
+    if request.prompt:
+        prompt = request.prompt
+        logger.info("Using provided prompt from Next.js app")
+    else:
+        prompt = build_analysis_prompt(request)
+        logger.info("Using fallback basic prompt")
 
     # Build use case properties from request context
     use_case_properties = {}

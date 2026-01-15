@@ -486,12 +486,16 @@ export async function POST(
       model === 'claude-3-5-haiku-20241022';
 
     if (isAnthropicModel) {
+      // Build the full analysis prompt (same prompt regardless of proxy or direct)
+      const prompt = buildAnalysisPrompt(vehicleInfo, context);
+
       // Check if Pay-i proxy is enabled for full instrumentation
       if (isPayiProxyEnabled()) {
         console.log('[analyze] Using Pay-i proxy for full instrumentation');
         const proxyResponse = await analyzeViaPayiProxy({
           images: base64Images,
           model,
+          prompt, // Pass the full prompt to the proxy
           vehicle_info: vehicleInfo
             ? {
                 make: vehicleInfo.make,
@@ -523,7 +527,6 @@ export async function POST(
       } else {
         // Direct Anthropic call with REST API tracking
         const client = new AnthropicClient();
-        const prompt = buildAnalysisPrompt(vehicleInfo, context);
         console.log('[analyze] Calling Anthropic API with', base64Images.length, 'image(s)...');
         response = await client.analyzeImages(base64Images, prompt);
       }

@@ -26,6 +26,7 @@ class AnalyzeRequest(BaseModel):
     """Request body for trail analysis."""
     images: list[str] = Field(..., description="List of base64-encoded images")
     model: str = Field(default="claude-sonnet-4-20250514", description="Model to use")
+    prompt: Optional[str] = Field(None, description="Full analysis prompt (if not provided, a basic prompt is generated)")
     vehicle_info: Optional[VehicleInfo] = None
     context: Optional[AnalysisContext] = None
     user_id: Optional[str] = Field(None, description="User ID for tracking")
