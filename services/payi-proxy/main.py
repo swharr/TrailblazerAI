@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 import anthropic
-from payi.lib.instrument import payi_instrument, track, track_context, get_context
+from payi.lib.instrument import payi_instrument, track_context, get_context
 
 from config import Settings, get_settings
 from models import (
@@ -100,30 +100,30 @@ async def health_check(settings: Settings = Depends(get_settings)):
     )
 
 
-@track(use_case_name="trail_analysis")
 def analyze_trail_images(
     images: list[str],
     prompt: str,
     model: str,
-    user_id: Optional[str] = None,
+    requesting_user_id: Optional[str] = None,
     use_case_properties: Optional[dict] = None,
     request_properties: Optional[dict] = None,
 ) -> tuple[str, dict]:
     """
     Analyze trail images using Anthropic with Pay-i tracking.
 
-    The @track decorator automatically:
-    - Creates a use case instance with unique ID
-    - Tracks all AI calls within this function
-    - Captures token usage and costs
-    - Associates properties with the use case
+    Uses track_context to:
+    - Create a use case instance with unique ID
+    - Track all AI calls within this context
+    - Capture token usage and costs
+    - Associate properties with the use case
     """
     if anthropic_client is None:
         raise HTTPException(status_code=503, detail="Anthropic client not initialized")
 
     # Use track_context for request-specific properties
     with track_context(
-        user_id=user_id,
+        use_case_name="trail_analysis",
+        user_id=requesting_user_id,
         use_case_properties=use_case_properties or {},
         request_properties=request_properties or {},
     ):
@@ -224,7 +224,7 @@ async def analyze(
             images=request.images,
             prompt=prompt,
             model=request.model,
-            user_id=request.user_id,
+            requesting_user_id=request.user_id,
             use_case_properties=use_case_properties,
             request_properties=request_properties,
         )
