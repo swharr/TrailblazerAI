@@ -15,7 +15,7 @@ import { ModelError, RateLimitError } from '@/lib/model-clients/base';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
-import { trackAnthropicUsage } from '@/lib/payi-client';
+import { trackAnthropicUsage, generateUseCaseId, trackTrailAnalysisSuccess } from '@/lib/payi-client';
 
 /** Supported models for image analysis */
 const SUPPORTED_VISION_MODELS: ModelName[] = [
@@ -550,7 +550,30 @@ export async function POST(
       latency: `${latency}ms`,
     });
 
-    // Track usage with Pay-i (fire and forget)
+    // Generate a unique use case instance ID for this analysis
+    const useCaseId = generateUseCaseId();
+
+    // Build use case properties (business-level metadata)
+    const useCaseProperties: Record<string, string> = {};
+    if (context?.trailName) useCaseProperties.trail_name = context.trailName;
+    if (context?.trailLocation) useCaseProperties.trail_location = context.trailLocation;
+    if (vehicleInfo?.make) useCaseProperties.vehicle_make = vehicleInfo.make;
+    if (vehicleInfo?.model) useCaseProperties.vehicle_model = vehicleInfo.model;
+    if (vehicleInfo?.year) useCaseProperties.vehicle_year = String(vehicleInfo.year);
+
+    // Build request properties (request-level metadata)
+    const requestProperties: Record<string, string> = {
+      image_count: String(images.length),
+      model_used: model,
+      has_vehicle_info: String(!!vehicleInfo),
+      has_context: String(!!context),
+      difficulty_result: String(analysis.difficulty),
+    };
+    if (analysis.trailType.length > 0) {
+      requestProperties.trail_types = analysis.trailType.join(',');
+    }
+
+    // Track usage with Pay-i (fire and forget) - now with enhanced context
     trackAnthropicUsage({
       model,
       inputTokens: response.usage.inputTokens,
@@ -558,6 +581,18 @@ export async function POST(
       latencyMs: latency,
       userId: session.user?.email || undefined,
       useCaseName: 'trail_analysis',
+      useCaseId,
+      useCaseVersion: 2, // Version 2: Enhanced with emergency comms, Starlink, etc.
+      useCaseProperties,
+      requestProperties,
+    });
+
+    // Track successful analysis KPI (fire and forget)
+    trackTrailAnalysisSuccess({
+      useCaseId,
+      difficulty: analysis.difficulty,
+      imageCount: images.length,
+      hasVehicleInfo: !!vehicleInfo,
     });
 
     // Save analysis to database
