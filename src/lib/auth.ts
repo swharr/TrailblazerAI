@@ -61,6 +61,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           image: user.image,
+          role: user.role,
         };
       },
     }),
@@ -89,12 +90,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
+        session.user.role = token.role as string;
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.sub = user.id;
+        token.role = (user as { role?: string }).role;
+      }
+      // Fetch role from database on session update (for OAuth users)
+      if (trigger === 'update' || (!token.role && token.sub)) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+        }
       }
       return token;
     },

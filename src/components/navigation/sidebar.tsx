@@ -10,8 +10,17 @@ import { Separator } from '@/components/ui/separator';
 import { ModeToggle } from '@/components/mode-toggle';
 import UserMenu from '@/components/auth/UserMenu';
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 
-const navItems = [
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  public?: boolean;
+  adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   {
     title: 'Sample Analysis',
     href: '/sample-analysis',
@@ -42,15 +51,26 @@ const navItems = [
     title: 'Admin',
     href: '/admin',
     icon: ShieldCheck,
+    adminOnly: true,
   },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  // Filter nav items based on user role
+  const visibleItems = navItems.filter((item) => {
+    // Hide admin-only items for non-admin users
+    if (item.adminOnly) {
+      return session?.user?.role === 'admin';
+    }
+    return true;
+  });
 
   return (
     <nav className="flex flex-col gap-2">
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href;
 
