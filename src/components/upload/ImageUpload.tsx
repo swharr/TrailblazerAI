@@ -5,7 +5,7 @@ import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-const MAX_IMAGES = 4;
+const MAX_IMAGES = 8;
 
 interface ImageFile {
   file: File;
@@ -30,14 +30,14 @@ export default function ImageUpload({
 
   const validateFile = (file: File): string | null => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB (Anthropic API limit)
+    const maxSize = 32 * 1024 * 1024; // 32MB max per image
 
     if (!validTypes.includes(file.type)) {
       return 'Please upload a JPG, PNG, or WebP image';
     }
 
     if (file.size > maxSize) {
-      return 'Image must be less than 5MB';
+      return 'Image must be less than 32MB';
     }
 
     return null;
@@ -165,7 +165,7 @@ export default function ImageUpload({
               Drop trail photos here or click to upload
             </p>
             <p className="text-sm text-muted-foreground">
-              JPG, PNG, or WebP up to 5MB each (max {MAX_IMAGES} photos)
+              JPG, PNG, or WebP up to 32MB each (max {MAX_IMAGES} photos)
             </p>
           </label>
         </div>

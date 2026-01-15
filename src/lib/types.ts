@@ -49,6 +49,8 @@ export interface TrailAnalysis {
   fuelEstimate?: FuelEstimate;
   // Emergency communication recommendations
   emergencyComms?: EmergencyComms;
+  // Starlink satellite coverage assessment
+  starlinkCoverage?: StarlinkCoverage;
 }
 
 // Fuel estimate for the trail
@@ -62,6 +64,36 @@ export interface FuelEstimate {
 export interface EmergencyComms {
   cellCoverage: 'none' | 'limited' | 'moderate' | 'good';
   recommendedMethods: string[];
+  notes?: string;
+  // Inter-vehicle communication recommendations
+  interVehicleComms?: {
+    recommendedChannel: string; // e.g., "GMRS Channel 19" or "Ham 146.520 MHz"
+    channelType: 'gmrs' | 'ham' | 'frs' | 'cb';
+    frequency?: string; // e.g., "462.650 MHz"
+    notes?: string;
+  };
+  // Emergency/distress frequencies
+  emergencyFrequencies?: {
+    primary: string; // e.g., "GMRS Channel 20 (462.675 MHz)"
+    secondary?: string;
+    hamEmergency?: string; // e.g., "146.520 MHz (Ham Calling)"
+    notes?: string;
+  };
+}
+
+// Starlink satellite coverage assessment
+export type StarlinkCoverageLevel =
+  | 'high-performance'
+  | 'good-coverage'
+  | 'some-issues'
+  | 'major-obstructions'
+  | 'zero-availability';
+
+export interface StarlinkCoverage {
+  coverage: StarlinkCoverageLevel;
+  confidence: 'low' | 'medium' | 'high';
+  obstructions?: string[]; // e.g., ["dense tree canopy", "canyon walls"]
+  bestSpots?: string[]; // e.g., ["ridgelines", "open meadows"]
   notes?: string;
 }
 

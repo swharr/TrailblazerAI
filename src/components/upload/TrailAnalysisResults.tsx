@@ -21,7 +21,11 @@ import {
   SignalZero,
   SignalLow,
   SignalMedium,
-  SignalHigh
+  SignalHigh,
+  Satellite,
+  Wifi,
+  WifiOff,
+  PhoneCall
 } from 'lucide-react';
 
 interface TrailAnalysisResultsProps {
@@ -165,7 +169,7 @@ export default function TrailAnalysisResults({
       </Card>
 
       {/* Fuel & Emergency Comms Card */}
-      {(analysis.fuelEstimate || analysis.emergencyComms) && (
+      {(analysis.fuelEstimate || analysis.emergencyComms || analysis.starlinkCoverage) && (
         <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
@@ -257,11 +261,163 @@ export default function TrailAnalysisResults({
                   </div>
                 )}
 
+                {/* Inter-Vehicle Communications */}
+                {analysis.emergencyComms.interVehicleComms && (
+                  <div className="mb-3 p-2 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <Radio className="h-3 w-3" />
+                      Inter-Vehicle Communication
+                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                        {analysis.emergencyComms.interVehicleComms.recommendedChannel}
+                      </p>
+                      {analysis.emergencyComms.interVehicleComms.frequency && (
+                        <p className="text-xs text-muted-foreground">
+                          Frequency: {analysis.emergencyComms.interVehicleComms.frequency}
+                        </p>
+                      )}
+                      <Badge variant="outline" className="text-xs uppercase">
+                        {analysis.emergencyComms.interVehicleComms.channelType}
+                      </Badge>
+                      {analysis.emergencyComms.interVehicleComms.notes && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {analysis.emergencyComms.interVehicleComms.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Emergency Frequencies */}
+                {analysis.emergencyComms.emergencyFrequencies && (
+                  <div className="mb-3 p-2 bg-red-50 dark:bg-red-950/50 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <PhoneCall className="h-3 w-3" />
+                      Emergency Frequencies
+                    </p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Primary</p>
+                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                          {analysis.emergencyComms.emergencyFrequencies.primary}
+                        </p>
+                      </div>
+                      {analysis.emergencyComms.emergencyFrequencies.secondary && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Secondary</p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            {analysis.emergencyComms.emergencyFrequencies.secondary}
+                          </p>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.emergencyFrequencies.hamEmergency && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ham Emergency</p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            {analysis.emergencyComms.emergencyFrequencies.hamEmergency}
+                          </p>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.emergencyFrequencies.notes && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {analysis.emergencyComms.emergencyFrequencies.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Notes */}
                 {analysis.emergencyComms.notes && (
                   <p className="text-sm text-muted-foreground flex items-start gap-1">
                     <Info className="h-3 w-3 mt-1 flex-shrink-0" />
                     {analysis.emergencyComms.notes}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Starlink Coverage */}
+            {analysis.starlinkCoverage && (
+              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                  <Satellite className="h-4 w-4" />
+                  Starlink Coverage
+                </p>
+
+                {/* Coverage Level */}
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    {analysis.starlinkCoverage.coverage === 'high-performance' && (
+                      <>
+                        <Wifi className="h-5 w-5 text-green-500" />
+                        <span className="text-sm font-medium text-green-600 dark:text-green-400">High Performance</span>
+                      </>
+                    )}
+                    {analysis.starlinkCoverage.coverage === 'good-coverage' && (
+                      <>
+                        <Wifi className="h-5 w-5 text-blue-500" />
+                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Good Coverage</span>
+                      </>
+                    )}
+                    {analysis.starlinkCoverage.coverage === 'some-issues' && (
+                      <>
+                        <Wifi className="h-5 w-5 text-yellow-500" />
+                        <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Some Issues Expected</span>
+                      </>
+                    )}
+                    {analysis.starlinkCoverage.coverage === 'major-obstructions' && (
+                      <>
+                        <WifiOff className="h-5 w-5 text-orange-500" />
+                        <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Major Obstructions</span>
+                      </>
+                    )}
+                    {analysis.starlinkCoverage.coverage === 'zero-availability' && (
+                      <>
+                        <WifiOff className="h-5 w-5 text-red-500" />
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Zero Availability</span>
+                      </>
+                    )}
+                    <Badge variant="outline" className="text-xs ml-auto">
+                      {analysis.starlinkCoverage.confidence} confidence
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Obstructions */}
+                {analysis.starlinkCoverage.obstructions && analysis.starlinkCoverage.obstructions.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs text-muted-foreground mb-1">Potential Obstructions</p>
+                    <div className="flex flex-wrap gap-1">
+                      {analysis.starlinkCoverage.obstructions.map((obs, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300">
+                          {obs}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Best Spots */}
+                {analysis.starlinkCoverage.bestSpots && analysis.starlinkCoverage.bestSpots.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs text-muted-foreground mb-1">Best Spots for Signal</p>
+                    <div className="flex flex-wrap gap-1">
+                      {analysis.starlinkCoverage.bestSpots.map((spot, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                          {spot}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {analysis.starlinkCoverage.notes && (
+                  <p className="text-xs text-muted-foreground flex items-start gap-1 mt-2">
+                    <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    {analysis.starlinkCoverage.notes}
                   </p>
                 )}
               </div>

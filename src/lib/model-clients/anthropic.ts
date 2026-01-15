@@ -10,8 +10,8 @@ import {
   RateLimitError,
 } from './base';
 
-/** Maximum image size in bytes (5MB - Anthropic API limit) */
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+/** Maximum image size in bytes (32MB for high-resolution images) */
+const MAX_IMAGE_SIZE_BYTES = 32 * 1024 * 1024;
 
 /** Default model to use */
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514' as const;
@@ -266,7 +266,7 @@ export class AnthropicClient implements ModelProvider {
     if (estimatedBytes > MAX_IMAGE_SIZE_BYTES) {
       const sizeMB = (estimatedBytes / (1024 * 1024)).toFixed(1);
       throw new ModelError(
-        `Image size (${sizeMB}MB) exceeds maximum allowed size of 5MB`,
+        `Image size (${sizeMB}MB) exceeds maximum allowed size of 32MB`,
         'anthropic',
         400,
         false

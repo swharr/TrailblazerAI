@@ -38,7 +38,26 @@ Return your analysis in this exact JSON format:
   "emergencyComms": {
     "cellCoverage": "<none|limited|moderate|good - estimated cell coverage>",
     "recommendedMethods": [<array of recommended emergency communication methods>],
-    "notes": "<specific guidance for the area if known, e.g., nearest ranger station, emergency frequencies>"
+    "notes": "<specific guidance for the area if known, e.g., nearest ranger station>",
+    "interVehicleComms": {
+      "recommendedChannel": "<recommended channel for group communication, e.g., 'GMRS Channel 19' or 'Ham 146.520 MHz'>",
+      "channelType": "<gmrs|ham|frs|cb>",
+      "frequency": "<actual frequency if known, e.g., '462.650 MHz'>",
+      "notes": "<tips for inter-vehicle communication in this terrain>"
+    },
+    "emergencyFrequencies": {
+      "primary": "<primary emergency channel, e.g., 'GMRS Channel 20 (462.675 MHz)'>",
+      "secondary": "<backup emergency option>",
+      "hamEmergency": "<Ham emergency frequency if applicable, e.g., '146.520 MHz National Calling'>",
+      "notes": "<local emergency services info if known>"
+    }
+  },
+  "starlinkCoverage": {
+    "coverage": "<high-performance|good-coverage|some-issues|major-obstructions|zero-availability>",
+    "confidence": "<low|medium|high - how confident based on visible terrain>",
+    "obstructions": [<array of potential obstructions like "dense tree canopy", "canyon walls", "steep terrain">],
+    "bestSpots": [<array of suggested spots for better coverage like "ridgelines", "open meadows", "clearings">],
+    "notes": "<tips for getting Starlink signal in this area>"
   }
 }
 
@@ -100,10 +119,31 @@ Emergency Communication Guidelines:
   - Satellite communicators (Garmin inReach, ZOLEO, Spot): Best for remote areas, SOS capability
   - Ham radio: Extended range with proper licensing
   - Cell phone: Only reliable in areas with coverage
-- If location is known, provide specific guidance:
-  - Relevant emergency frequencies (GMRS channel 20 for emergencies)
-  - Nearest ranger stations or emergency services
-  - Known dead zones or areas with coverage
+
+Inter-Vehicle Communication Recommendations:
+- GMRS is preferred for most overlanding groups (no license exam, 5W+ power)
+- Recommend specific channels based on terrain:
+  - Open terrain: GMRS Channel 19 (462.650 MHz) or Channel 20 (462.675 MHz)
+  - Mountainous: Consider GMRS repeater channels if local repeaters known
+  - FRS (lower power) for close convoy travel
+- For Ham operators: 146.520 MHz (2m National Simplex Calling) or local repeaters
+- CB Channel 4 or 19 as alternatives for groups without GMRS
+
+Emergency Frequencies:
+- GMRS Channel 20 (462.675 MHz): Unofficial GMRS emergency/travel channel
+- Ham 146.520 MHz: 2-meter National Simplex Calling frequency
+- Ham 446.000 MHz: 70cm National Simplex Calling frequency
+- NOAA Weather: 162.400-162.550 MHz (receive only)
+- If location known, include local Search & Rescue or ranger frequencies
+
+Starlink Coverage Assessment:
+- High Performance: Clear sky view 100°+ in all directions, no obstructions above 25° elevation
+- Good Coverage: Minor obstructions, 80%+ clear sky view, brief interruptions possible
+- Some Issues: Moderate tree cover or terrain features, expect periodic dropouts
+- Major Obstructions: Dense canopy, deep canyons, or steep terrain blocking >50% of sky
+- Zero Availability: Slot canyons, dense old-growth forest, or covered areas with no sky view
+- Consider: Time of day matters (satellite positions change), suggest best spots for connectivity
+- Tips: Ridgelines, meadows, lakeshores, and road pullouts often have better coverage
 
 Be specific and observational in your analysis. Base your assessment only on what is visible in the image(s). If trail location is provided, incorporate local knowledge about fuel availability and emergency services.`;
 

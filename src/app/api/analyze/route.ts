@@ -25,11 +25,11 @@ const SUPPORTED_VISION_MODELS: ModelName[] = [
   'claude-3-5-haiku-20241022',
 ];
 
-/** Maximum file size per image (5MB - Anthropic API limit) */
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+/** Maximum file size per image (32MB for high-resolution images) */
+const MAX_FILE_SIZE = 32 * 1024 * 1024;
 
 /** Maximum number of images */
-const MAX_IMAGES = 4;
+const MAX_IMAGES = 8;
 
 /** Allowed image MIME types */
 const ALLOWED_MIME_TYPES = [
@@ -132,6 +132,50 @@ function parseAnalysisJson(text: string): TrailAnalysis {
         : [],
       notes: parsed.emergencyComms.notes,
     };
+
+    // Parse inter-vehicle comms if present
+    if (parsed.emergencyComms.interVehicleComms) {
+      const validChannelTypes = ['gmrs', 'ham', 'frs', 'cb'];
+      analysis.emergencyComms.interVehicleComms = {
+        recommendedChannel: parsed.emergencyComms.interVehicleComms.recommendedChannel || 'GMRS Channel 19',
+        channelType: validChannelTypes.includes(parsed.emergencyComms.interVehicleComms.channelType)
+          ? parsed.emergencyComms.interVehicleComms.channelType
+          : 'gmrs',
+        frequency: parsed.emergencyComms.interVehicleComms.frequency,
+        notes: parsed.emergencyComms.interVehicleComms.notes,
+      };
+    }
+
+    // Parse emergency frequencies if present
+    if (parsed.emergencyComms.emergencyFrequencies) {
+      analysis.emergencyComms.emergencyFrequencies = {
+        primary: parsed.emergencyComms.emergencyFrequencies.primary || 'GMRS Channel 20 (462.675 MHz)',
+        secondary: parsed.emergencyComms.emergencyFrequencies.secondary,
+        hamEmergency: parsed.emergencyComms.emergencyFrequencies.hamEmergency,
+        notes: parsed.emergencyComms.emergencyFrequencies.notes,
+      };
+    }
+  }
+
+  // Parse Starlink coverage if present
+  if (parsed.starlinkCoverage) {
+    const validCoverageLevel = ['high-performance', 'good-coverage', 'some-issues', 'major-obstructions', 'zero-availability'];
+    const validConfidence = ['low', 'medium', 'high'];
+    analysis.starlinkCoverage = {
+      coverage: validCoverageLevel.includes(parsed.starlinkCoverage.coverage)
+        ? parsed.starlinkCoverage.coverage
+        : 'some-issues',
+      confidence: validConfidence.includes(parsed.starlinkCoverage.confidence)
+        ? parsed.starlinkCoverage.confidence
+        : 'medium',
+      obstructions: Array.isArray(parsed.starlinkCoverage.obstructions)
+        ? parsed.starlinkCoverage.obstructions
+        : [],
+      bestSpots: Array.isArray(parsed.starlinkCoverage.bestSpots)
+        ? parsed.starlinkCoverage.bestSpots
+        : [],
+      notes: parsed.starlinkCoverage.notes,
+    };
   }
 
   return analysis;
@@ -186,7 +230,7 @@ export async function OPTIONS(): Promise<NextResponse> {
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Trail images (1-4, max 5MB each)
+ *                 description: Trail images (1-8, max 32MB each)
  *               model:
  *                 type: string
  *                 enum: [claude-sonnet-4-20250514, claude-opus-4-20250514, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022]
@@ -333,7 +377,7 @@ export async function POST(
         return NextResponse.json(
           {
             success: false,
-            error: `Image ${i + 1} is too large (${sizeMB}MB). Maximum size is 5MB per image.`,
+            error: `Image ${i + 1} is too large (${sizeMB}MB). Maximum size is 32MB per image.`,
           },
           { status: 400, headers: getCorsHeaders() }
         );
