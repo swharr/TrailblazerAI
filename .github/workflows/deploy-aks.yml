@@ -99,7 +99,11 @@ jobs:
       - name: Create namespace if not exists
         run: kubectl create namespace trailblazer-ai --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Create/Update secrets
+      - name: Deploy to AKS
+        run: |
+          kubectl apply -k k8s/overlays/aks
+
+      - name: Apply secrets from GitHub Secrets
         run: |
           kubectl create secret generic trailblazer-ai-secrets \
             --namespace trailblazer-ai \
@@ -107,13 +111,15 @@ jobs:
             --from-literal=DATABASE_URL=${{ secrets.DATABASE_URL }} \
             --from-literal=AUTH_SECRET=${{ secrets.AUTH_SECRET }} \
             --from-literal=NEXTAUTH_SECRET=${{ secrets.AUTH_SECRET }} \
-            --from-literal=OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=GOOGLE_AI_API_KEY="${{ secrets.GOOGLE_AI_API_KEY }}" \
+            --from-literal=XAI_API_KEY="${{ secrets.XAI_API_KEY }}" \
             --from-literal=MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy to AKS
+      - name: Restart deployment to pick up secrets
         run: |
-          kubectl apply -k k8s/overlays/aks
+          kubectl rollout restart deployment/trailblazer-ai -n trailblazer-ai
           kubectl rollout status deployment/trailblazer-ai -n trailblazer-ai --timeout=300s
 
       - name: Verify deployment
