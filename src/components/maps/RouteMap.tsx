@@ -103,6 +103,7 @@ export default function RouteMap({
   const [newWaypointType, setNewWaypointType] = useState<WaypointType>('waypoint');
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
   const [draggingWaypointId, setDraggingWaypointId] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Handle map click to add waypoint
   const handleMapClick = useCallback(
@@ -153,9 +154,9 @@ export default function RouteMap({
     [editable, onWaypointsChange, waypoints]
   );
 
-  // Fit bounds to waypoints
+  // Fit bounds to waypoints when map is loaded
   useEffect(() => {
-    if (waypoints.length > 0 && mapRef.current) {
+    if (waypoints.length > 0 && mapRef.current && mapLoaded) {
       const bounds = waypoints.reduce(
         (acc, wp) => {
           return {
@@ -178,7 +179,7 @@ export default function RouteMap({
         );
       }
     }
-  }, [waypoints, waypoints.length]);
+  }, [waypoints, mapLoaded]);
 
   // Check for Mapbox token - must be after all hooks
   if (!MAPBOX_TOKEN) {
@@ -307,6 +308,7 @@ export default function RouteMap({
             : 'mapbox://styles/mapbox/satellite-streets-v12'
         }
         onClick={handleMapClick}
+        onLoad={() => setMapLoaded(true)}
         cursor={isAddingWaypoint ? 'crosshair' : 'grab'}
         terrain={mapStyle === 'outdoors' ? { source: 'mapbox-dem', exaggeration: 1.5 } : undefined}
       >
