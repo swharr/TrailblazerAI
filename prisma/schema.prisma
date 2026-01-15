@@ -98,6 +98,10 @@ model PlannedRoute {
   // Flag for demo/sample routes viewable without auth
   isDemo          Boolean  @default(false)
 
+  // Sharing
+  isPublic        Boolean  @default(false)
+  shareToken      String?  @unique
+
   // Waypoints stored as JSON array: [{lat, lng, elevation?, name?, type?}]
   waypoints       Json
 
@@ -111,6 +115,7 @@ model PlannedRoute {
 
   @@index([userId])
   @@index([isDemo])
+  @@index([shareToken])
 }
 
 model VehicleProfile {

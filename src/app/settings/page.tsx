@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Car, Plus, Star, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Car, Plus, Star, Pencil, Trash2, Loader2, User, Shield, Check, X, Map, Share2, Copy } from 'lucide-react';
 import { VEHICLE_MAKES_MODELS, VEHICLE_FEATURES, VEHICLE_YEARS, SUSPENSION_BRANDS, SUSPENSION_TRAVEL_TYPES, getModelsForMake } from '@/lib/vehicle-data';
 import type { VehicleFeature, SuspensionBrand, SuspensionTravelType } from '@/lib/types';
 
@@ -41,6 +41,25 @@ interface VehicleFormData {
   isDefault: boolean;
 }
 
+interface UserProfile {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+  hasPassword: boolean;
+}
+
+interface SavedRoute {
+  id: string;
+  name: string;
+  status: string;
+  totalDistance: number | null;
+  estimatedTime: number | null;
+  isPublic: boolean;
+  shareToken: string | null;
+  createdAt: string;
+}
+
 const emptyForm: VehicleFormData = {
   name: '',
   make: '',
@@ -54,6 +73,23 @@ const emptyForm: VehicleFormData = {
 
 export default function SettingsPage() {
   const { status } = useSession();
+
+  // Profile state
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileName, setProfileName] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Vehicle state
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,6 +97,41 @@ export default function SettingsPage() {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleFormData>(emptyForm);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+
+  // Routes state
+  const [routes, setRoutes] = useState<SavedRoute[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(true);
+  const [sharingRouteId, setSharingRouteId] = useState<string | null>(null);
+  const [copiedRouteId, setCopiedRouteId] = useState<string | null>(null);
+
+  // Password validation
+  const passwordRequirements = {
+    minLength: newPassword.length >= 8,
+    hasUppercase: /[A-Z]/.test(newPassword),
+    hasLowercase: /[a-z]/.test(newPassword),
+    hasNumber: /[0-9]/.test(newPassword),
+    matches: newPassword === confirmPassword && newPassword.length > 0,
+  };
+  const isPasswordValid = Object.values(passwordRequirements).every(Boolean);
+
+  // Fetch profile
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/profile');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setProfile(data.user);
+          setProfileName(data.user.name || '');
+          setProfileImage(data.user.image || '');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
 
   // Fetch vehicles
   const fetchVehicles = useCallback(async () => {
@@ -77,13 +148,32 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // Fetch routes
+  const fetchRoutes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/routes');
+      if (res.ok) {
+        const data = await res.json();
+        setRoutes(data.routes || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch routes:', error);
+    } finally {
+      setRoutesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (status === 'authenticated') {
+      fetchProfile();
       fetchVehicles();
+      fetchRoutes();
     } else if (status === 'unauthenticated') {
+      setProfileLoading(false);
       setLoading(false);
+      setRoutesLoading(false);
     }
-  }, [status, fetchVehicles]);
+  }, [status, fetchProfile, fetchVehicles, fetchRoutes]);
 
   // Update available models when make changes
   useEffect(() => {
@@ -93,6 +183,72 @@ export default function SettingsPage() {
       setAvailableModels([]);
     }
   }, [form.make]);
+
+  // Save profile
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    setProfileMessage(null);
+
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileName.trim() || null,
+          image: profileImage.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setProfile((prev) => prev ? { ...prev, name: data.user.name, image: data.user.image } : null);
+        setProfileMessage({ type: 'success', text: 'Profile updated successfully' });
+      } else {
+        setProfileMessage({ type: 'error', text: data.error || 'Failed to update profile' });
+      }
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+      setProfileMessage({ type: 'error', text: 'Failed to update profile' });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // Change password
+  const handleChangePassword = async () => {
+    if (!isPasswordValid) return;
+
+    setSavingPassword(true);
+    setPasswordMessage(null);
+
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setPasswordMessage({ type: 'success', text: 'Password changed successfully' });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordMessage({ type: 'error', text: data.error || 'Failed to change password' });
+      }
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      setPasswordMessage({ type: 'error', text: 'Failed to change password' });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
 
   // Open dialog for new vehicle
   const handleNewVehicle = () => {
@@ -190,16 +346,279 @@ export default function SettingsPage() {
     }));
   };
 
+  // Share route
+  const handleShareRoute = async (routeId: string) => {
+    setSharingRouteId(routeId);
+    try {
+      const res = await fetch(`/api/routes/${routeId}/share`, { method: 'POST' });
+      if (res.ok) {
+        fetchRoutes();
+      }
+    } catch (error) {
+      console.error('Failed to share route:', error);
+    } finally {
+      setSharingRouteId(null);
+    }
+  };
+
+  // Unshare route
+  const handleUnshareRoute = async (routeId: string) => {
+    setSharingRouteId(routeId);
+    try {
+      const res = await fetch(`/api/routes/${routeId}/share`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchRoutes();
+      }
+    } catch (error) {
+      console.error('Failed to unshare route:', error);
+    } finally {
+      setSharingRouteId(null);
+    }
+  };
+
+  // Copy share link
+  const handleCopyShareLink = async (shareToken: string, routeId: string) => {
+    const url = `${window.location.origin}/routes/shared/${shareToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedRouteId(routeId);
+      setTimeout(() => setCopiedRouteId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  // Format duration
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  };
+
+  // Get initials for avatar fallback
+  const getInitials = (name: string | null, email: string) => {
+    if (name) {
+      return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return email[0].toUpperCase();
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Settings</h1>
         <p className="text-muted-foreground">
-          Configure your TrailBlazer AI preferences and manage your vehicles.
+          Manage your profile, security, and preferences.
         </p>
       </div>
 
       <div className="space-y-6">
+        {/* Profile Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Profile
+            </CardTitle>
+            <CardDescription>
+              Update your display name and profile picture.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {profileLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : status === 'unauthenticated' ? (
+              <p className="text-muted-foreground text-center py-4">
+                Sign in to manage your profile.
+              </p>
+            ) : profile ? (
+              <div className="space-y-6">
+                {/* Avatar Preview */}
+                <div className="flex items-center gap-4">
+                  <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-border">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <span className={`text-2xl font-semibold text-muted-foreground ${profileImage ? 'hidden' : ''}`}>
+                      {getInitials(profileName || profile.name, profile.email)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-medium">{profileName || profile.name || 'No name set'}</p>
+                    <p className="text-sm text-muted-foreground">{profile.email}</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Profile Form */}
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="display-name">Display Name</Label>
+                    <Input
+                      id="display-name"
+                      placeholder="Enter your name"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-image">Profile Image URL</Label>
+                    <Input
+                      id="profile-image"
+                      placeholder="https://example.com/your-image.jpg"
+                      value={profileImage}
+                      onChange={(e) => setProfileImage(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter a URL to an image. You can use services like Gravatar or social media profile images.
+                    </p>
+                  </div>
+                </div>
+
+                {profileMessage && (
+                  <div className={`p-3 rounded-md text-sm ${
+                    profileMessage.type === 'success'
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}>
+                    {profileMessage.text}
+                  </div>
+                )}
+
+                <Button onClick={handleSaveProfile} disabled={savingProfile}>
+                  {savingProfile && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Profile
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Security Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Security
+            </CardTitle>
+            <CardDescription>
+              Change your password and manage account security.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {profileLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : status === 'unauthenticated' ? (
+              <p className="text-muted-foreground text-center py-4">
+                Sign in to manage your security settings.
+              </p>
+            ) : profile && !profile.hasPassword ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">
+                  You signed in with Google, Apple, or a passkey.
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Password management is not available for OAuth accounts.
+                </p>
+              </div>
+            ) : profile ? (
+              <div className="space-y-6">
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Password Requirements */}
+                {newPassword && (
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium">Password requirements:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className={`flex items-center gap-2 ${passwordRequirements.minLength ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {passwordRequirements.minLength ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                        At least 8 characters
+                      </div>
+                      <div className={`flex items-center gap-2 ${passwordRequirements.hasUppercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {passwordRequirements.hasUppercase ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                        One uppercase letter
+                      </div>
+                      <div className={`flex items-center gap-2 ${passwordRequirements.hasLowercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {passwordRequirements.hasLowercase ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                        One lowercase letter
+                      </div>
+                      <div className={`flex items-center gap-2 ${passwordRequirements.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {passwordRequirements.hasNumber ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                        One number
+                      </div>
+                      <div className={`flex items-center gap-2 ${passwordRequirements.matches ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {passwordRequirements.matches ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                        Passwords match
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {passwordMessage && (
+                  <div className={`p-3 rounded-md text-sm ${
+                    passwordMessage.type === 'success'
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}>
+                    {passwordMessage.text}
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={savingPassword || !isPasswordValid || !currentPassword}
+                >
+                  {savingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Change Password
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
         {/* My Vehicles */}
         <Card>
           <CardHeader>
@@ -485,6 +904,123 @@ export default function SettingsPage() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* My Routes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Map className="h-5 w-5" />
+              My Routes
+            </CardTitle>
+            <CardDescription>
+              Manage your saved routes and share them with others.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {routesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : status === 'unauthenticated' ? (
+              <p className="text-muted-foreground text-center py-4">
+                Sign in to manage your routes.
+              </p>
+            ) : routes.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground mb-4">
+                  No routes saved yet. Plan your first route to see it here.
+                </p>
+                <Button variant="outline" asChild>
+                  <a href="/plan">
+                    <Map className="h-4 w-4 mr-2" />
+                    Plan a Route
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {routes.map((route) => (
+                  <div
+                    key={route.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Map className="h-8 w-8 text-muted-foreground" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{route.name}</span>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {route.status}
+                          </Badge>
+                          {route.isPublic && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Share2 className="h-3 w-3 mr-1" />
+                              Shared
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {route.totalDistance ? `${route.totalDistance.toFixed(1)} mi` : 'No distance'}
+                          {route.estimatedTime && ` • ${formatDuration(route.estimatedTime)}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {route.isPublic && route.shareToken ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyShareLink(route.shareToken!, route.id)}
+                            title="Copy share link"
+                          >
+                            {copiedRouteId === route.id ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnshareRoute(route.id)}
+                            disabled={sharingRouteId === route.id}
+                            title="Stop sharing"
+                          >
+                            {sharingRouteId === route.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleShareRoute(route.id)}
+                          disabled={sharingRouteId === route.id}
+                          title="Share route"
+                        >
+                          {sharingRouteId === route.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Share2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href="/plan" title="Edit route">
+                          <Pencil className="h-4 w-4" />
+                        </a>
+                      </Button>
                     </div>
                   </div>
                 ))}
