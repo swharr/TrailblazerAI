@@ -115,6 +115,8 @@ jobs:
             --from-literal=GOOGLE_AI_API_KEY="${{ secrets.GOOGLE_AI_API_KEY }}" \
             --from-literal=XAI_API_KEY="${{ secrets.XAI_API_KEY }}" \
             --from-literal=MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }} \
+            --from-literal=PAYI_BASE_URL="${{ secrets.PAYI_BASE_URL }}" \
+            --from-literal=PAYI_API_KEY="${{ secrets.PAYI_API_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Restart deployment to pick up secrets
