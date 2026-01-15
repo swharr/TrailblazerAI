@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Map, LayoutDashboard, Menu, Settings } from 'lucide-react';
+import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Route } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -12,6 +12,12 @@ import UserMenu from '@/components/auth/UserMenu';
 import { useState } from 'react';
 
 const navItems = [
+  {
+    title: 'Sample Route',
+    href: '/sample-route',
+    icon: Route,
+    public: true, // Visible without auth
+  },
   {
     title: 'Analyze',
     href: '/analyze',
@@ -31,6 +37,11 @@ const navItems = [
     title: 'Settings',
     href: '/settings',
     icon: Settings,
+  },
+  {
+    title: 'Admin',
+    href: '/admin',
+    icon: ShieldCheck,
   },
 ];
 

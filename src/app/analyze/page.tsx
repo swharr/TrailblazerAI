@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,9 +20,22 @@ import {
 import ImageUpload from '@/components/upload/ImageUpload';
 import VehicleInfoForm from '@/components/upload/VehicleInfoForm';
 import TrailAnalysisResults from '@/components/upload/TrailAnalysisResults';
-import { ModelName, AnalysisResult, VehicleInfo, AnalysisContext } from '@/lib/types';
-import { Loader2, Sparkles, MapPin, ChevronDown, Info } from 'lucide-react';
+import { ModelName, AnalysisResult, VehicleInfo, AnalysisContext, VehicleFeature, SuspensionBrand, SuspensionTravelType } from '@/lib/types';
+import { Loader2, Sparkles, MapPin, ChevronDown, Info, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// Saved vehicle from API
+interface SavedVehicle {
+  id: string;
+  name: string | null;
+  make: string;
+  model: string;
+  year: number | null;
+  features: string[];
+  suspensionBrand: string | null;
+  suspensionTravel: string | null;
+  isDefault: boolean;
+}
 
 export default function AnalyzePage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -30,6 +43,11 @@ export default function AnalyzePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Saved vehicles state
+  const [savedVehicles, setSavedVehicles] = useState<SavedVehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
 
   // Vehicle info state
   const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo | null>(null);
@@ -39,6 +57,72 @@ export default function AnalyzePage() {
   const [trailName, setTrailName] = useState('');
   const [trailLocation, setTrailLocation] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
+
+  // Fetch saved vehicles on mount
+  useEffect(() => {
+    async function fetchVehicles() {
+      try {
+        const res = await fetch('/api/vehicles');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.vehicles) {
+            setSavedVehicles(data.vehicles);
+            // Auto-select default vehicle if exists
+            const defaultVehicle = data.vehicles.find((v: SavedVehicle) => v.isDefault);
+            if (defaultVehicle) {
+              setSelectedVehicleId(defaultVehicle.id);
+              // Convert to VehicleInfo format
+              setVehicleInfo({
+                id: defaultVehicle.id,
+                make: defaultVehicle.make,
+                model: defaultVehicle.model,
+                year: defaultVehicle.year || undefined,
+                features: defaultVehicle.features as VehicleFeature[],
+                suspensionBrand: defaultVehicle.suspensionBrand as SuspensionBrand | undefined,
+                suspensionTravel: defaultVehicle.suspensionTravel as SuspensionTravelType | undefined,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch vehicles:', err);
+      } finally {
+        setLoadingVehicles(false);
+      }
+    }
+    fetchVehicles();
+  }, []);
+
+  // Handle saved vehicle selection
+  const handleVehicleSelect = useCallback((vehicleId: string) => {
+    setSelectedVehicleId(vehicleId);
+
+    if (vehicleId === 'manual') {
+      // User wants to enter manually
+      setVehicleInfo(null);
+      return;
+    }
+
+    if (vehicleId === '') {
+      // No vehicle selected
+      setVehicleInfo(null);
+      return;
+    }
+
+    // Find and set the selected vehicle
+    const vehicle = savedVehicles.find(v => v.id === vehicleId);
+    if (vehicle) {
+      setVehicleInfo({
+        id: vehicle.id,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year || undefined,
+        features: vehicle.features as VehicleFeature[],
+        suspensionBrand: vehicle.suspensionBrand as SuspensionBrand | undefined,
+        suspensionTravel: vehicle.suspensionTravel as SuspensionTravelType | undefined,
+      });
+    }
+  }, [savedVehicles]);
 
   const handleImagesChange = useCallback((files: File[]) => {
     setSelectedFiles(files);
@@ -130,12 +214,89 @@ export default function AnalyzePage() {
         {/* Optional sections - show when images selected */}
         {selectedFiles.length > 0 && !result && (
           <>
-            {/* Your Rig Info */}
-            <VehicleInfoForm
-              value={vehicleInfo}
-              onChange={handleVehicleChange}
-              disabled={isAnalyzing}
-            />
+            {/* Vehicle Selection */}
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base font-medium">
+                  <Truck className="h-5 w-5 text-muted-foreground" />
+                  <span>Your Rig</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (Optional)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                {/* Saved Vehicle Selector */}
+                {!loadingVehicles && savedVehicles.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Select a saved vehicle</label>
+                    <Select
+                      value={selectedVehicleId}
+                      onValueChange={handleVehicleSelect}
+                      disabled={isAnalyzing}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a vehicle..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No vehicle</SelectItem>
+                        {savedVehicles.map((vehicle) => (
+                          <SelectItem key={vehicle.id} value={vehicle.id}>
+                            <div className="flex items-center gap-2">
+                              <span>
+                                {vehicle.name || `${vehicle.make} ${vehicle.model}`}
+                                {vehicle.year && ` (${vehicle.year})`}
+                              </span>
+                              {vehicle.isDefault && (
+                                <span className="text-xs text-muted-foreground">★ Default</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="manual">
+                          <span className="text-muted-foreground">Enter details manually...</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {selectedVehicleId && selectedVehicleId !== 'manual' && vehicleInfo && (
+                      <p className="text-xs text-muted-foreground">
+                        Using {vehicleInfo.make} {vehicleInfo.model}
+                        {vehicleInfo.year && ` (${vehicleInfo.year})`}
+                        {vehicleInfo.features.length > 0 && ` with ${vehicleInfo.features.length} modifications`}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Show loading state */}
+                {loadingVehicles && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading saved vehicles...
+                  </div>
+                )}
+
+                {/* Show manual form if no saved vehicles or manual selected */}
+                {!loadingVehicles && (savedVehicles.length === 0 || selectedVehicleId === 'manual') && (
+                  <VehicleInfoForm
+                    value={vehicleInfo}
+                    onChange={handleVehicleChange}
+                    disabled={isAnalyzing}
+                  />
+                )}
+
+                {/* Prompt to save vehicles if none exist */}
+                {!loadingVehicles && savedVehicles.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Tip: Save your vehicles in{' '}
+                    <a href="/settings" className="text-primary hover:underline">
+                      Settings
+                    </a>{' '}
+                    for quick selection on future analyses.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Trail Context */}
             <Card className="border-dashed">

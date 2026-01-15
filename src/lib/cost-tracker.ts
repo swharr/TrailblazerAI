@@ -26,6 +26,10 @@ export const MODEL_COSTS: Record<
   'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.3 },
   'gemini-pro': { inputPer1M: 0.5, outputPer1M: 1.5 },
   'gemini-pro-vision': { inputPer1M: 0.5, outputPer1M: 1.5 },
+  // xAI (Grok) models - placeholder pricing
+  'grok-2': { inputPer1M: 2.0, outputPer1M: 10.0 },
+  'grok-2-vision': { inputPer1M: 2.0, outputPer1M: 10.0 },
+  'grok-2-vision-1212': { inputPer1M: 2.0, outputPer1M: 10.0 },
 };
 
 /**

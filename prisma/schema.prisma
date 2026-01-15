@@ -17,6 +17,7 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?   // For credentials auth
+  role          String    @default("user") // "user" or "admin"
 
   // Relations
   accounts       Account[]
@@ -24,6 +25,7 @@ model User {
   authenticators Authenticator[] // WebAuthn/Passkeys
   vehicles       VehicleProfile[]
   analyses       TrailAnalysis[]
+  plannedRoutes  PlannedRoute[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -82,6 +84,35 @@ model Authenticator {
 }
 
 // TrailBlazer AI Models
+model PlannedRoute {
+  id              String   @id @default(cuid())
+  userId          String?  // Nullable for demo routes
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?  @db.Text
+
+  // Status: draft, planned, completed
+  status          String   @default("draft")
+
+  // Flag for demo/sample routes viewable without auth
+  isDemo          Boolean  @default(false)
+
+  // Waypoints stored as JSON array: [{lat, lng, elevation?, name?, type?}]
+  waypoints       Json
+
+  // Calculated fields
+  totalDistance   Float?   // in miles
+  estimatedTime   Int?     // in minutes
+  elevationGain   Float?   // in feet
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isDemo])
+}
+
 model VehicleProfile {
   id               String   @id @default(cuid())
   userId           String

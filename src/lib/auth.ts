@@ -25,21 +25,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('[Auth] Missing credentials');
           return null;
         }
 
-        const email = credentials.email as string;
+        const email = (credentials.email as string).toLowerCase();
         const password = credentials.password as string;
+
+        console.log('[Auth] Looking up user:', email);
 
         const user = await db.user.findUnique({
           where: { email },
         });
 
-        if (!user || !user.passwordHash) {
+        if (!user) {
+          console.log('[Auth] User not found');
+          return null;
+        }
+
+        if (!user.passwordHash) {
+          console.log('[Auth] User has no password hash (OAuth-only account)');
           return null;
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        console.log('[Auth] Password valid:', isPasswordValid);
 
         if (!isPasswordValid) {
           return null;

@@ -1,6 +1,6 @@
 // lib/types.ts
 
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'bedrock';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'bedrock' | 'xai';
 
 export type ModelName =
   // Anthropic models
@@ -19,7 +19,11 @@ export type ModelName =
   | 'gemini-1.5-pro'
   | 'gemini-1.5-flash'
   | 'gemini-pro'
-  | 'gemini-pro-vision';
+  | 'gemini-pro-vision'
+  // xAI (Grok) models
+  | 'grok-2'
+  | 'grok-2-vision'
+  | 'grok-2-vision-1212';
 
 export interface ModelConfig {
   provider: ModelProvider;
@@ -76,6 +80,7 @@ export interface VehicleSettings {
 
 // User's vehicle information
 export interface VehicleInfo {
+  id?: string; // Database ID if saved vehicle
   make: string;
   model: string;
   year?: number;
@@ -85,23 +90,43 @@ export interface VehicleInfo {
   suspensionTravel?: SuspensionTravelType;
 }
 
-// Popular suspension kit brands
+// Suspension kit brands and combinations
+// Supports both standalone brands and kit+shock combos (e.g., Camburg + King)
 export type SuspensionBrand =
+  // Stock/OEM
   | 'stock'
+  // Complete systems (shocks included)
   | 'icon'
-  | 'king'
   | 'fox'
+  | 'king'
   | 'bilstein'
-  | 'dirt-king'
-  | 'camburg'
-  | 'total-chaos'
-  | 'rclt'
-  | 'kibbetech'
-  | 'baja-kits'
-  | 'deaver'
   | 'ome'
   | 'dobinsons'
   | 'eibach'
+  // Kit manufacturers (pair with shock brand)
+  | 'camburg'
+  | 'camburg-king'
+  | 'camburg-fox'
+  | 'camburg-complete'
+  | 'dirt-king'
+  | 'dirt-king-king'
+  | 'dirt-king-fox'
+  | 'total-chaos'
+  | 'total-chaos-king'
+  | 'total-chaos-fox'
+  | 'rclt'
+  | 'rclt-king'
+  | 'rclt-fox'
+  | 'kibbetech'
+  | 'kibbetech-king'
+  | 'kibbetech-fox'
+  | 'baja-kits'
+  | 'baja-kits-king'
+  | 'baja-kits-fox'
+  // Leaf spring specialists
+  | 'deaver'
+  | 'deaver-king'
+  | 'deaver-fox'
   | 'other';
 
 // Suspension travel types
@@ -158,6 +183,7 @@ export interface AnalysisResult {
   analysis: TrailAnalysis;
   metrics: AnalysisMetrics;
   imageUrl?: string;
+  id?: string; // Database ID if saved
 }
 // Trail and Route Types
 export interface Coordinates {
@@ -269,4 +295,19 @@ export interface NavItem {
   href: string;
   icon?: string;
   description?: string;
+}
+
+// Comparison Mode Types
+export interface ComparisonRequest {
+  models: ModelName[];
+  images: string[]; // base64 encoded
+  vehicleInfo?: VehicleInfo;
+  context?: AnalysisContext;
+}
+
+export interface ComparisonResult {
+  results: Record<string, AnalysisResult>;
+  errors: Record<string, string>;
+  totalCost: number;
+  totalLatency: number;
 }

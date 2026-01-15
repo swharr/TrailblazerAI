@@ -13,6 +13,8 @@ import { buildAnalysisPrompt } from '@/lib/prompts';
 import { trackMetric, calculateCost } from '@/lib/cost-tracker';
 import { ModelError, RateLimitError } from '@/lib/model-clients/base';
 import { requireAuth } from '@/lib/api-auth';
+import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
 /** Supported models for image analysis */
 const SUPPORTED_VISION_MODELS: ModelName[] = [
@@ -409,10 +411,71 @@ export async function POST(
       latency: `${latency}ms`,
     });
 
+    // Save analysis to database
+    let savedAnalysisId: string | null = null;
+    try {
+      // Get user from database
+      const user = await prisma.user.findUnique({
+        where: { email: session.user?.email?.toLowerCase() || '' },
+        select: { id: true },
+      });
+
+      if (user) {
+        // Check if vehicleInfo has an ID (saved vehicle) or just form data
+        const vehicleId = vehicleInfo?.id || null;
+
+        const savedAnalysis = await prisma.trailAnalysis.create({
+          data: {
+            userId: user.id,
+            vehicleId: vehicleId,
+            // Trail context
+            trailName: context?.trailName || null,
+            trailLocation: context?.trailLocation || null,
+            notes: context?.additionalNotes || null,
+            // Analysis results
+            difficulty: analysis.difficulty,
+            trailType: analysis.trailType,
+            conditions: analysis.conditions,
+            hazards: analysis.hazards,
+            recommendations: analysis.recommendations,
+            bestFor: analysis.bestFor,
+            summary: analysis.summary,
+            rawResponse: analysis.rawResponse || response.text,
+            // Optional AI recommendations (cast to Prisma JSON type)
+            vehicleSettings: analysis.vehicleSettings
+              ? (analysis.vehicleSettings as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            fuelEstimate: analysis.fuelEstimate
+              ? (analysis.fuelEstimate as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            emergencyComms: analysis.emergencyComms
+              ? (analysis.emergencyComms as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            // Create metrics record
+            metrics: {
+              create: {
+                model: metrics.model,
+                inputTokens: metrics.inputTokens,
+                outputTokens: metrics.outputTokens,
+                cost: cost,
+                latencyMs: latency,
+              },
+            },
+          },
+        });
+        savedAnalysisId = savedAnalysis.id;
+        console.log('[analyze] Analysis saved to database:', savedAnalysisId);
+      }
+    } catch (dbError) {
+      // Log but don't fail the request - analysis was successful
+      console.error('[analyze] Failed to save to database:', dbError);
+    }
+
     // Build the result
     const result: AnalysisResult = {
       analysis,
       metrics,
+      id: savedAnalysisId || undefined,
     };
 
     console.log('[analyze] Analysis complete, returning result');

@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: trailblazer-ai
-  namespace: trailblazer-ai
   labels:
     app.kubernetes.io/name: trailblazer-ai
     app.kubernetes.io/component: web
@@ -22,6 +21,7 @@ spec:
         app.kubernetes.io/name: trailblazer-ai
         app.kubernetes.io/component: web
     spec:
+      serviceAccountName: trailblazer-ai
       containers:
         - name: trailblazer-ai
           image: trailblazer-ai:latest

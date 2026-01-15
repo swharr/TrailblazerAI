@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trailblazer-ai-config
+data:
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXTAUTH_URL: "https://demoapp.t8rsk8s.io"
+  AUTH_TRUST_HOST: "true"
+  # Mapbox public token for maps (get from https://account.mapbox.com/access-tokens/)
+  # Leave empty to disable maps - app will show fallback UI
+  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: "pk.eyJ1IjoiaW5rZWR0YXRlciIsImEiOiJjbWtleXJtMW4wY2lmM2RxNGRleXFoZHRqIn0.P8TjVdwmr4EprpVhGV98QA"

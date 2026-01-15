@@ -1,0 +1,30 @@
+# RBAC for TrailBlazer AI to manage secrets
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trailblazer-ai
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trailblazer-secrets-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["trailblazer-ai-secrets"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trailblazer-secrets-binding
+subjects:
+  - kind: ServiceAccount
+    name: trailblazer-ai
+roleRef:
+  kind: Role
+  name: trailblazer-secrets-manager
+  apiGroup: rbac.authorization.k8s.io

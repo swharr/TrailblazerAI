@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +42,6 @@ function AppleIcon() {
 }
 
 export default function SignInForm() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -64,13 +62,13 @@ export default function SignInForm() {
 
       if (result?.error) {
         setError('Invalid email or password');
-      } else {
-        router.push('/dashboard');
-        router.refresh();
+        setIsLoading(false);
+      } else if (result?.ok) {
+        // Force a full page navigation to ensure session is loaded
+        window.location.href = '/';
       }
     } catch {
       setError('Something went wrong. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };

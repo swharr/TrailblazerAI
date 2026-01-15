@@ -214,21 +214,40 @@ function formatFeatures(features: VehicleFeature[]): string {
  */
 function formatSuspensionBrand(brand: SuspensionBrand): string {
   const brandLabels: Record<SuspensionBrand, string> = {
+    // Stock/OEM
     'stock': 'Stock/OEM',
+    // Complete systems (shocks included)
     'icon': 'ICON Vehicle Dynamics',
-    'king': 'King Shocks',
     'fox': 'FOX',
+    'king': 'King Shocks',
     'bilstein': 'Bilstein',
-    'dirt-king': 'Dirt King Fabrication',
-    'camburg': 'Camburg Engineering',
-    'total-chaos': 'Total Chaos Fabrication',
-    'rclt': 'RCLT (Race Car Long Travel)',
-    'kibbetech': 'Kibbetech',
-    'baja-kits': 'Baja Kits',
-    'deaver': 'Deaver Spring',
     'ome': 'Old Man Emu',
     'dobinsons': 'Dobinsons',
     'eibach': 'Eibach',
+    // Kit manufacturers (standalone and combos)
+    'camburg': 'Camburg Engineering',
+    'camburg-king': 'Camburg Engineering w/ King Shocks',
+    'camburg-fox': 'Camburg Engineering w/ FOX',
+    'camburg-complete': 'Camburg Complete Kit',
+    'dirt-king': 'Dirt King Fabrication',
+    'dirt-king-king': 'Dirt King Fabrication w/ King Shocks',
+    'dirt-king-fox': 'Dirt King Fabrication w/ FOX',
+    'total-chaos': 'Total Chaos Fabrication',
+    'total-chaos-king': 'Total Chaos Fabrication w/ King Shocks',
+    'total-chaos-fox': 'Total Chaos Fabrication w/ FOX',
+    'rclt': 'RCLT (Race Car Long Travel)',
+    'rclt-king': 'RCLT w/ King Shocks',
+    'rclt-fox': 'RCLT w/ FOX',
+    'kibbetech': 'Kibbetech',
+    'kibbetech-king': 'Kibbetech w/ King Shocks',
+    'kibbetech-fox': 'Kibbetech w/ FOX',
+    'baja-kits': 'Baja Kits',
+    'baja-kits-king': 'Baja Kits w/ King Shocks',
+    'baja-kits-fox': 'Baja Kits w/ FOX',
+    // Leaf spring specialists
+    'deaver': 'Deaver Spring',
+    'deaver-king': 'Deaver Spring w/ King Shocks',
+    'deaver-fox': 'Deaver Spring w/ FOX',
     'other': 'Aftermarket',
   };
   return brandLabels[brand] || brand;

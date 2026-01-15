@@ -233,31 +233,71 @@ export const VEHICLE_YEARS: number[] = Array.from(
   (_, i) => new Date().getFullYear() - i
 );
 
-// Suspension brand options
+// Suspension brand options - organized by category
 export interface SuspensionBrandOption {
   value: SuspensionBrand;
   label: string;
   description: string;
+  category: 'stock' | 'complete' | 'kit-combo' | 'leaf-spring';
 }
 
 export const SUSPENSION_BRANDS: SuspensionBrandOption[] = [
-  { value: 'stock', label: 'Stock/OEM', description: 'Factory suspension' },
-  { value: 'icon', label: 'ICON', description: 'ICON Vehicle Dynamics' },
-  { value: 'king', label: 'King Shocks', description: 'King Off-Road Racing Shocks' },
-  { value: 'fox', label: 'FOX', description: 'FOX Factory Racing' },
-  { value: 'bilstein', label: 'Bilstein', description: 'Bilstein Shocks' },
-  { value: 'dirt-king', label: 'Dirt King', description: 'Dirt King Fabrication' },
-  { value: 'camburg', label: 'Camburg', description: 'Camburg Engineering' },
-  { value: 'total-chaos', label: 'Total Chaos', description: 'Total Chaos Fabrication' },
-  { value: 'rclt', label: 'RCLT', description: 'Race Car Long Travel' },
-  { value: 'kibbetech', label: 'Kibbetech', description: 'Kibbetech Off-Road' },
-  { value: 'baja-kits', label: 'Baja Kits', description: 'Baja Kits Off-Road' },
-  { value: 'deaver', label: 'Deaver', description: 'Deaver Spring' },
-  { value: 'ome', label: 'Old Man Emu', description: 'ARB Old Man Emu' },
-  { value: 'dobinsons', label: 'Dobinsons', description: 'Dobinsons Spring & Suspension' },
-  { value: 'eibach', label: 'Eibach', description: 'Eibach Springs' },
-  { value: 'other', label: 'Other', description: 'Other aftermarket brand' },
+  // Stock/OEM
+  { value: 'stock', label: 'Stock/OEM', description: 'Factory suspension', category: 'stock' },
+
+  // Complete systems (shocks included in kit)
+  { value: 'icon', label: 'ICON Vehicle Dynamics', description: 'Complete coilover/shock systems', category: 'complete' },
+  { value: 'fox', label: 'FOX Factory', description: 'FOX performance shocks & coilovers', category: 'complete' },
+  { value: 'king', label: 'King Shocks', description: 'King coilovers & bypass shocks', category: 'complete' },
+  { value: 'bilstein', label: 'Bilstein', description: 'Bilstein shock systems', category: 'complete' },
+  { value: 'ome', label: 'Old Man Emu', description: 'ARB OME complete lift kits', category: 'complete' },
+  { value: 'dobinsons', label: 'Dobinsons', description: 'Dobinsons springs & shocks', category: 'complete' },
+  { value: 'eibach', label: 'Eibach', description: 'Eibach Pro-Truck systems', category: 'complete' },
+
+  // Camburg kits with shock options
+  { value: 'camburg', label: 'Camburg (shocks not specified)', description: 'Camburg long travel kit', category: 'kit-combo' },
+  { value: 'camburg-king', label: 'Camburg + King', description: 'Camburg kit with King shocks', category: 'kit-combo' },
+  { value: 'camburg-fox', label: 'Camburg + FOX', description: 'Camburg kit with FOX shocks', category: 'kit-combo' },
+  { value: 'camburg-complete', label: 'Camburg Complete', description: 'Camburg turnkey system', category: 'kit-combo' },
+
+  // Dirt King kits with shock options
+  { value: 'dirt-king', label: 'Dirt King (shocks not specified)', description: 'Dirt King Fabrication kit', category: 'kit-combo' },
+  { value: 'dirt-king-king', label: 'Dirt King + King', description: 'Dirt King kit with King shocks', category: 'kit-combo' },
+  { value: 'dirt-king-fox', label: 'Dirt King + FOX', description: 'Dirt King kit with FOX shocks', category: 'kit-combo' },
+
+  // Total Chaos kits with shock options
+  { value: 'total-chaos', label: 'Total Chaos (shocks not specified)', description: 'Total Chaos Fabrication kit', category: 'kit-combo' },
+  { value: 'total-chaos-king', label: 'Total Chaos + King', description: 'Total Chaos kit with King shocks', category: 'kit-combo' },
+  { value: 'total-chaos-fox', label: 'Total Chaos + FOX', description: 'Total Chaos kit with FOX shocks', category: 'kit-combo' },
+
+  // RCLT kits with shock options
+  { value: 'rclt', label: 'RCLT (shocks not specified)', description: 'Race Car Long Travel kit', category: 'kit-combo' },
+  { value: 'rclt-king', label: 'RCLT + King', description: 'RCLT kit with King shocks', category: 'kit-combo' },
+  { value: 'rclt-fox', label: 'RCLT + FOX', description: 'RCLT kit with FOX shocks', category: 'kit-combo' },
+
+  // Kibbetech kits with shock options
+  { value: 'kibbetech', label: 'Kibbetech (shocks not specified)', description: 'Kibbetech Off-Road kit', category: 'kit-combo' },
+  { value: 'kibbetech-king', label: 'Kibbetech + King', description: 'Kibbetech kit with King shocks', category: 'kit-combo' },
+  { value: 'kibbetech-fox', label: 'Kibbetech + FOX', description: 'Kibbetech kit with FOX shocks', category: 'kit-combo' },
+
+  // Baja Kits with shock options
+  { value: 'baja-kits', label: 'Baja Kits (shocks not specified)', description: 'Baja Kits Off-Road kit', category: 'kit-combo' },
+  { value: 'baja-kits-king', label: 'Baja Kits + King', description: 'Baja Kits with King shocks', category: 'kit-combo' },
+  { value: 'baja-kits-fox', label: 'Baja Kits + FOX', description: 'Baja Kits with FOX shocks', category: 'kit-combo' },
+
+  // Leaf spring specialists
+  { value: 'deaver', label: 'Deaver Springs', description: 'Deaver custom leaf springs', category: 'leaf-spring' },
+  { value: 'deaver-king', label: 'Deaver + King', description: 'Deaver springs with King shocks', category: 'leaf-spring' },
+  { value: 'deaver-fox', label: 'Deaver + FOX', description: 'Deaver springs with FOX shocks', category: 'leaf-spring' },
+
+  // Other
+  { value: 'other', label: 'Other', description: 'Other aftermarket setup', category: 'complete' },
 ];
+
+// Get suspension brands by category
+export function getSuspensionByCategory(category: SuspensionBrandOption['category']): SuspensionBrandOption[] {
+  return SUSPENSION_BRANDS.filter((s) => s.category === category);
+}
 
 // Suspension travel type options
 export interface SuspensionTravelOption {
