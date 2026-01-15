@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, Route } from 'lucide-react';
+import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -22,15 +22,15 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    title: 'Sample Analysis',
+    title: 'Sample Trail Analysis',
     href: '/sample-analysis',
     icon: Sparkles,
     public: true, // Visible without auth
   },
   {
-    title: 'Sample Route',
+    title: 'Sample Route Plan',
     href: '/sample-route',
-    icon: Route,
+    icon: MapPin,
     public: true, // Visible without auth
   },
   {
