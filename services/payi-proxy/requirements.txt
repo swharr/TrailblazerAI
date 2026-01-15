@@ -4,8 +4,8 @@ uvicorn[standard]==0.32.0
 pydantic==2.10.0
 pydantic-settings==2.6.0
 
-# Pay-i SDK
-payi>=0.1.0
+# Pay-i SDK (still in alpha)
+payi>=0.1.0a150
 
 # AI Providers
 anthropic>=0.40.0
