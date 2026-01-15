@@ -43,6 +43,7 @@ export type WaypointType =
 interface RouteMapProps {
   waypoints: RouteWaypoint[];
   onWaypointsChange?: (waypoints: RouteWaypoint[]) => void;
+  onAddingWaypointChange?: (isAdding: boolean) => void;
   editable?: boolean;
   initialViewState?: {
     latitude: number;
@@ -91,6 +92,7 @@ const routeLineStyle: LineLayerSpecification = {
 export default function RouteMap({
   waypoints,
   onWaypointsChange,
+  onAddingWaypointChange,
   editable = true,
   initialViewState,
   className,
@@ -122,8 +124,9 @@ export default function RouteMap({
 
       onWaypointsChange([...waypoints, newWaypoint]);
       setIsAddingWaypoint(false);
+      onAddingWaypointChange?.(false);
     },
-    [isAddingWaypoint, editable, onWaypointsChange, waypoints, newWaypointType]
+    [isAddingWaypoint, editable, onWaypointsChange, onAddingWaypointChange, waypoints, newWaypointType]
   );
 
   // Handle waypoint drag
@@ -212,7 +215,11 @@ export default function RouteMap({
             <Button
               size="sm"
               variant={isAddingWaypoint ? 'default' : 'outline'}
-              onClick={() => setIsAddingWaypoint(!isAddingWaypoint)}
+              onClick={() => {
+                const newValue = !isAddingWaypoint;
+                setIsAddingWaypoint(newValue);
+                onAddingWaypointChange?.(newValue);
+              }}
               className="w-full"
             >
               <Plus className="h-4 w-4 mr-2" />

@@ -15,9 +15,10 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPage) {
     // Use getToken which is Edge-compatible (reads JWT from cookie)
+    // NextAuth v5 uses AUTH_SECRET
     const token = await getToken({
       req: request,
-      secret: process.env.NEXTAUTH_SECRET,
+      secret: process.env.AUTH_SECRET,
     });
 
     if (!token) {

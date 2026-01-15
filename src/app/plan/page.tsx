@@ -52,6 +52,7 @@ export default function PlanPage() {
   const [loadingRoutes, setLoadingRoutes] = useState(true);
   const [currentRouteId, setCurrentRouteId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [isAddingWaypoint, setIsAddingWaypoint] = useState(false);
 
   // Calculate route stats
   const distance = calculateRouteDistance(waypoints);
@@ -395,12 +396,13 @@ export default function PlanPage() {
         <RouteMap
           waypoints={waypoints}
           onWaypointsChange={handleWaypointsChange}
+          onAddingWaypointChange={setIsAddingWaypoint}
           editable={true}
           className="w-full h-full"
         />
 
-        {/* Empty state */}
-        {waypoints.length === 0 && (
+        {/* Empty state - hidden when adding waypoint to allow map clicks */}
+        {waypoints.length === 0 && !isAddingWaypoint && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Card className="bg-background/80 backdrop-blur pointer-events-auto">
               <CardContent className="py-8 text-center">
