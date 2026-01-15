@@ -17,9 +17,14 @@ export async function middleware(request: NextRequest) {
     // Use getToken which is Edge-compatible (reads JWT from cookie)
     // NextAuth v5 uses AUTH_SECRET, fallback to NEXTAUTH_SECRET for compatibility
     const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
+    // NextAuth v5 uses 'authjs' as the cookie prefix
     const token = await getToken({
       req: request,
       secret,
+      cookieName: process.env.NODE_ENV === 'production'
+        ? '__Secure-authjs.session-token'
+        : 'authjs.session-token',
     });
 
     if (!token) {
