@@ -1,94 +1,152 @@
 # TrailBlazer AI - Session State
 
-> Last updated: 2026-01-14
-> Session: AKS Deployment Setup with Spot VMs
+Last Updated: 2026-01-15
 
-## Current Task
-Deploying TrailBlazer AI to Azure Kubernetes Service (AKS) with Spot VMs
-
-## Status: WAITING ON AZURE LOGIN
-User needs to switch Azure subscription/login to one with permission to create resource groups.
-
-**Next step:** Run `./scripts/azure-setup.sh` after logging in with appropriate permissions.
+## Current Status: WORKING
+App is live at https://demoapp.t8rsk8s.io
 
 ---
 
-## AKS Deployment - What's Been Created
+## Recent Session (2026-01-15)
 
-### Scripts
-| File | Purpose |
-|------|---------|
-| `scripts/azure-setup.sh` | Creates ACR, AKS with Spot node pool, NGINX ingress |
-| `scripts/setup-github-secrets.sh` | Generates Azure credentials for GitHub Actions |
+### Completed Work
 
-### Kubernetes (AKS overlay with Spot support)
-| File | Purpose |
-|------|---------|
-| `k8s/overlays/aks/kustomization.yaml` | Kustomize config pointing to ACR |
-| `k8s/overlays/aks/ingress-patch.yaml` | NGINX ingress with SSL settings |
-| `k8s/overlays/aks/deployment-patch.yaml` | Spot VM tolerations + node affinity |
-| `k8s/overlays/aks/configmap-patch.yaml` | Production config |
+#### User Settings Feature
+- Profile management (name, image URL)
+- Password change for credentials-based accounts
+- Route sharing with shareable links
+- Settings page UI with Profile, Security, My Routes sections
+- Files: `src/app/settings/page.tsx`, `src/app/api/user/profile/route.ts`, `src/app/api/user/password/route.ts`
 
-### CI/CD
-| File | Purpose |
-|------|---------|
-| `.github/workflows/deploy-aks.yml` | Build, push, deploy on push to main |
+#### Route Sharing
+- Share token generation/revocation API
+- Public route viewing page (no auth required)
+- Files: `src/app/api/routes/[id]/share/route.ts`, `src/app/api/routes/shared/[token]/route.ts`, `src/app/routes/shared/[token]/page.tsx`
 
-### Documentation
-| File | Purpose |
-|------|---------|
-| `docs/aks-deployment.md` | Full deployment guide |
+#### Auth Fixes
+- Fixed NextAuth v5 cookie name in middleware (`__Secure-authjs.session-token`)
+- Added role to JWT/session for admin checks
+- Admin link hidden in sidebar for non-admin users
+- GitHub secrets configured
+- Files: `src/lib/auth.ts`, `src/middleware.ts`, `src/types/next-auth.d.ts`, `src/components/navigation/Sidebar.tsx`
 
-## Azure Configuration
+#### Database Updates
+- Added `isPublic` and `shareToken` fields to PlannedRoute model
+- Schema pushed to Azure PostgreSQL
+
+### Demo User
+- **Email:** demouser@icloud.com
+- **Password:** R1d3th@t$h1t2026!
+- **Role:** user (non-admin)
+
+### Known Issues / TODO
+
+#### GitHub Workflow Overwrites Secrets
+The deploy-aks.yml workflow recreates secrets on every deploy. GitHub secrets are now configured, but if they get out of sync, manually patch Kubernetes secrets:
+```bash
+kubectl patch secret trailblazer-ai-secrets -n trailblazer-ai -p '{"data":{...}}'
+```
+
+#### Potential Improvements
+- Add file upload for profile pictures (currently URL-based)
+- Add email verification flow
+- Add password reset flow
+- Consider Azure Key Vault for secrets management
+
+---
+
+## Infrastructure
+
+### Azure Resources
 ```
 Resource Group: mrg-trailblazer-ai-demos
-Location:       westus2
-ACR:            trailblazeraicr
+Location:       West US 3
+ACR:            trailblazeraicr.azurecr.io
 AKS:            trailblazer-aks
-
-Node Pools:
-  - System: 1x Standard_B2s (on-demand) - for ingress
-  - Spot:   2-5x Standard_D2s_v3 (autoscaling, ~80% discount)
-
-Estimated cost: ~$80/month (vs ~$180 without Spot)
+PostgreSQL:     trailblazer-db.postgres.database.azure.com
+Ingress:        demoapp.t8rsk8s.io
 ```
 
-## After Infrastructure Created
-1. Run `./scripts/setup-github-secrets.sh` to get credentials for GitHub Actions
-2. Update domain in `k8s/overlays/aks/ingress-patch.yaml`
-3. Update domain in `k8s/overlays/aks/configmap-patch.yaml`
-4. Push to main or run `kubectl apply -k k8s/overlays/aks`
+### Secrets
+All secrets backed up in `.secrets.local` (gitignored):
+- DATABASE_URL (Azure PostgreSQL)
+- AUTH_SECRET / NEXTAUTH_SECRET
+- ANTHROPIC_API_KEY
+- MAPBOX_ACCESS_TOKEN
+- Demo user credentials
+
+### GitHub Secrets (Configured)
+- AUTH_SECRET
+- DATABASE_URL
+- ANTHROPIC_API_KEY
+- MAPBOX_ACCESS_TOKEN
+- AZURE_CREDENTIALS
 
 ---
 
-## Previous Session - Database + Auth (Completed)
+## Key Files Reference
 
-### Completed
-- [x] Trail analysis feature fully implemented
-- [x] Pushed to GitHub: https://github.com/swharr/TrailblazerAI
-- [x] PostgreSQL via Docker (port 5433)
-- [x] Prisma schema with all models
-- [x] NextAuth v5 with credentials + OAuth + passkeys
-- [x] Auth middleware (Edge-compatible)
-- [x] Security hardening (CORS, headers, strong passwords)
+### Auth System
+| File | Purpose |
+|------|---------|
+| `src/lib/auth.ts` | NextAuth v5 config with role in JWT |
+| `src/middleware.ts` | Protected routes with correct cookie name |
+| `src/types/next-auth.d.ts` | Type extensions for role |
+| `src/lib/api-auth.ts` | API route auth helpers |
 
-### Pending
-- [ ] Set up Google OAuth credentials
-- [ ] Set up Apple OAuth credentials
-- [ ] API routes for analyses and vehicles
-- [ ] Dashboard with real data
+### User Settings
+| File | Purpose |
+|------|---------|
+| `src/app/settings/page.tsx` | Full settings page UI |
+| `src/app/api/user/profile/route.ts` | Profile GET/PATCH |
+| `src/app/api/user/password/route.ts` | Password change |
+
+### Route Sharing
+| File | Purpose |
+|------|---------|
+| `src/app/api/routes/[id]/share/route.ts` | Generate/revoke share tokens |
+| `src/app/api/routes/shared/[token]/route.ts` | Public route access |
+| `src/app/routes/shared/[token]/page.tsx` | Public shared route page |
+
+### Navigation
+| File | Purpose |
+|------|---------|
+| `src/components/navigation/Sidebar.tsx` | Admin link hidden for non-admins |
+
+### Deployment
+| File | Purpose |
+|------|---------|
+| `.github/workflows/deploy-aks.yml` | CI/CD pipeline |
+| `k8s/overlays/aks/` | AKS Kustomize overlay |
+
+---
 
 ## Commands to Resume
 
 ```bash
-# Start PostgreSQL
+# Start local PostgreSQL
 docker compose up -d
 
 # Start dev server
-npm run dev
+npm run dev    # http://localhost:3636
 
-# Deploy to AKS (after azure-setup.sh completes)
-./scripts/azure-setup.sh
-./scripts/setup-github-secrets.sh
-kubectl apply -k k8s/overlays/aks
+# Check production logs
+kubectl logs deployment/trailblazer-ai -n trailblazer-ai --tail=50
+
+# Fix secrets if needed
+kubectl patch secret trailblazer-ai-secrets -n trailblazer-ai -p '{"data":{...}}'
+
+# Force restart deployment
+kubectl rollout restart deployment/trailblazer-ai -n trailblazer-ai
 ```
+
+---
+
+## Previous Work (Completed)
+
+- Trail analysis feature with AI vision
+- PostgreSQL + Prisma ORM
+- NextAuth v5 (credentials + OAuth + passkeys)
+- Security hardening (CORS, headers, rate limiting)
+- AKS deployment with Spot VMs
+- Mapbox integration for route planning
