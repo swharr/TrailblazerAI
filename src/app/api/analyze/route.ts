@@ -15,7 +15,13 @@ import { ModelError, RateLimitError } from '@/lib/model-clients/base';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
-import { trackAnthropicUsage, generateUseCaseId, trackTrailAnalysisSuccess } from '@/lib/payi-client';
+import {
+  trackAnthropicUsage,
+  generateUseCaseId,
+  trackTrailAnalysisSuccess,
+  isPayiProxyEnabled,
+  analyzeViaPayiProxy,
+} from '@/lib/payi-client';
 
 /** Supported models for image analysis */
 const SUPPORTED_VISION_MODELS: ModelName[] = [
@@ -469,7 +475,8 @@ export async function POST(
 
     // Create appropriate client based on model
     console.log('[analyze] Creating client for model:', model);
-    let response;
+    let response: { text: string; usage: { inputTokens: number; outputTokens: number } };
+    let proxyUseCaseId: string | undefined;
 
     // Check if model is an Anthropic model
     const isAnthropicModel =
@@ -479,10 +486,47 @@ export async function POST(
       model === 'claude-3-5-haiku-20241022';
 
     if (isAnthropicModel) {
-      const client = new AnthropicClient();
-      const prompt = buildAnalysisPrompt(vehicleInfo, context);
-      console.log('[analyze] Calling Anthropic API with', base64Images.length, 'image(s)...');
-      response = await client.analyzeImages(base64Images, prompt);
+      // Check if Pay-i proxy is enabled for full instrumentation
+      if (isPayiProxyEnabled()) {
+        console.log('[analyze] Using Pay-i proxy for full instrumentation');
+        const proxyResponse = await analyzeViaPayiProxy({
+          images: base64Images,
+          model,
+          vehicle_info: vehicleInfo
+            ? {
+                make: vehicleInfo.make,
+                model: vehicleInfo.model,
+                year: vehicleInfo.year,
+                features: vehicleInfo.features,
+                suspension_brand: vehicleInfo.suspensionBrand,
+                suspension_travel: vehicleInfo.suspensionTravel,
+              }
+            : undefined,
+          context: context
+            ? {
+                trail_name: context.trailName,
+                trail_location: context.trailLocation,
+                additional_notes: context.additionalNotes,
+              }
+            : undefined,
+          user_id: session.user?.email || undefined,
+        });
+
+        response = {
+          text: proxyResponse.text,
+          usage: {
+            inputTokens: proxyResponse.usage.input_tokens,
+            outputTokens: proxyResponse.usage.output_tokens,
+          },
+        };
+        proxyUseCaseId = proxyResponse.use_case_id;
+      } else {
+        // Direct Anthropic call with REST API tracking
+        const client = new AnthropicClient();
+        const prompt = buildAnalysisPrompt(vehicleInfo, context);
+        console.log('[analyze] Calling Anthropic API with', base64Images.length, 'image(s)...');
+        response = await client.analyzeImages(base64Images, prompt);
+      }
     } else {
       // This shouldn't happen due to earlier validation, but just in case
       return NextResponse.json(
@@ -550,50 +594,56 @@ export async function POST(
       latency: `${latency}ms`,
     });
 
-    // Generate a unique use case instance ID for this analysis
-    const useCaseId = generateUseCaseId();
+    // Use proxy use case ID if available, otherwise generate one
+    const useCaseId = proxyUseCaseId || generateUseCaseId();
 
-    // Build use case properties (business-level metadata)
-    const useCaseProperties: Record<string, string> = {};
-    if (context?.trailName) useCaseProperties.trail_name = context.trailName;
-    if (context?.trailLocation) useCaseProperties.trail_location = context.trailLocation;
-    if (vehicleInfo?.make) useCaseProperties.vehicle_make = vehicleInfo.make;
-    if (vehicleInfo?.model) useCaseProperties.vehicle_model = vehicleInfo.model;
-    if (vehicleInfo?.year) useCaseProperties.vehicle_year = String(vehicleInfo.year);
+    // Only do manual Pay-i tracking if NOT using the proxy
+    // (the proxy handles tracking automatically via the Python SDK)
+    if (!isPayiProxyEnabled()) {
+      // Build use case properties (business-level metadata)
+      const useCaseProperties: Record<string, string> = {};
+      if (context?.trailName) useCaseProperties.trail_name = context.trailName;
+      if (context?.trailLocation) useCaseProperties.trail_location = context.trailLocation;
+      if (vehicleInfo?.make) useCaseProperties.vehicle_make = vehicleInfo.make;
+      if (vehicleInfo?.model) useCaseProperties.vehicle_model = vehicleInfo.model;
+      if (vehicleInfo?.year) useCaseProperties.vehicle_year = String(vehicleInfo.year);
 
-    // Build request properties (request-level metadata)
-    const requestProperties: Record<string, string> = {
-      image_count: String(images.length),
-      model_used: model,
-      has_vehicle_info: String(!!vehicleInfo),
-      has_context: String(!!context),
-      difficulty_result: String(analysis.difficulty),
-    };
-    if (analysis.trailType.length > 0) {
-      requestProperties.trail_types = analysis.trailType.join(',');
+      // Build request properties (request-level metadata)
+      const requestProperties: Record<string, string> = {
+        image_count: String(images.length),
+        model_used: model,
+        has_vehicle_info: String(!!vehicleInfo),
+        has_context: String(!!context),
+        difficulty_result: String(analysis.difficulty),
+      };
+      if (analysis.trailType.length > 0) {
+        requestProperties.trail_types = analysis.trailType.join(',');
+      }
+
+      // Track usage with Pay-i REST API (fire and forget)
+      trackAnthropicUsage({
+        model,
+        inputTokens: response.usage.inputTokens,
+        outputTokens: response.usage.outputTokens,
+        latencyMs: latency,
+        userId: session.user?.email || undefined,
+        useCaseName: 'trail_analysis',
+        useCaseId,
+        useCaseVersion: 2, // Version 2: Enhanced with emergency comms, Starlink, etc.
+        useCaseProperties,
+        requestProperties,
+      });
+
+      // Track successful analysis KPI (fire and forget)
+      trackTrailAnalysisSuccess({
+        useCaseId,
+        difficulty: analysis.difficulty,
+        imageCount: images.length,
+        hasVehicleInfo: !!vehicleInfo,
+      });
+    } else {
+      console.log('[analyze] Pay-i tracking handled by proxy, use_case_id:', useCaseId);
     }
-
-    // Track usage with Pay-i (fire and forget) - now with enhanced context
-    trackAnthropicUsage({
-      model,
-      inputTokens: response.usage.inputTokens,
-      outputTokens: response.usage.outputTokens,
-      latencyMs: latency,
-      userId: session.user?.email || undefined,
-      useCaseName: 'trail_analysis',
-      useCaseId,
-      useCaseVersion: 2, // Version 2: Enhanced with emergency comms, Starlink, etc.
-      useCaseProperties,
-      requestProperties,
-    });
-
-    // Track successful analysis KPI (fire and forget)
-    trackTrailAnalysisSuccess({
-      useCaseId,
-      difficulty: analysis.difficulty,
-      imageCount: images.length,
-      hasVehicleInfo: !!vehicleInfo,
-    });
 
     // Save analysis to database
     let savedAnalysisId: string | null = null;

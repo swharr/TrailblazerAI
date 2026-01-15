@@ -599,3 +599,116 @@ export async function trackTrailAnalysisSuccess(params: {
       });
   }
 }
+
+// ============================================================================
+// Pay-i Proxy Client
+// ============================================================================
+
+export interface PayiProxyConfig {
+  /** Pay-i proxy service URL (e.g., 'http://payi-proxy:8000') */
+  baseUrl: string;
+  /** Whether proxy is enabled */
+  enabled: boolean;
+}
+
+export interface PayiProxyAnalyzeRequest {
+  images: string[];
+  model: string;
+  vehicle_info?: {
+    make: string;
+    model: string;
+    year?: number;
+    features?: string[];
+    suspension_brand?: string;
+    suspension_travel?: string;
+  };
+  context?: {
+    trail_name?: string;
+    trail_location?: string;
+    additional_notes?: string;
+  };
+  user_id?: string;
+  account_name?: string;
+  limit_ids?: string[];
+}
+
+export interface PayiProxyAnalyzeResponse {
+  success: boolean;
+  text: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cost?: number;
+    input_cost?: number;
+    output_cost?: number;
+  };
+  use_case_id: string;
+  payi_request_id?: string;
+  error?: string;
+}
+
+/**
+ * Get Pay-i proxy configuration from environment variables
+ */
+export function getPayiProxyConfig(): PayiProxyConfig {
+  const baseUrl = process.env.PAYI_PROXY_URL || '';
+  const enabled = !!baseUrl;
+
+  return {
+    baseUrl,
+    enabled,
+  };
+}
+
+/**
+ * Check if Pay-i proxy is enabled
+ */
+export function isPayiProxyEnabled(): boolean {
+  return !!process.env.PAYI_PROXY_URL;
+}
+
+/**
+ * Call the Pay-i proxy service for trail analysis with full instrumentation
+ */
+export async function analyzeViaPayiProxy(
+  request: PayiProxyAnalyzeRequest
+): Promise<PayiProxyAnalyzeResponse> {
+  const config = getPayiProxyConfig();
+
+  if (!config.enabled) {
+    throw new Error('Pay-i proxy is not configured');
+  }
+
+  const url = `${config.baseUrl}/analyze`;
+
+  console.log('[Pay-i Proxy] Calling proxy service:', {
+    url,
+    imageCount: request.images.length,
+    model: request.model,
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Pay-i Proxy] Request failed:', response.status, errorText);
+    throw new Error(`Pay-i proxy error: ${response.status} - ${errorText}`);
+  }
+
+  const data = (await response.json()) as PayiProxyAnalyzeResponse;
+
+  console.log('[Pay-i Proxy] Response received:', {
+    success: data.success,
+    inputTokens: data.usage.input_tokens,
+    outputTokens: data.usage.output_tokens,
+    useCaseId: data.use_case_id,
+  });
+
+  return data;
+}

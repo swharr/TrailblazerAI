@@ -10,6 +10,9 @@ images:
   - name: trailblazer-ai
     newName: trailblazeraicr.azurecr.io/trailblazer-ai
     newTag: latest
+  - name: payi-proxy
+    newName: trailblazeraicr.azurecr.io/payi-proxy
+    newTag: latest
 
 patches:
   - path: ingress-patch.yaml

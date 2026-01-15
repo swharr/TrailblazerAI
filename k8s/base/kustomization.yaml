@@ -9,6 +9,8 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - payi-proxy-deployment.yaml
+  - payi-proxy-service.yaml
 
 commonLabels:
   app.kubernetes.io/name: trailblazer-ai

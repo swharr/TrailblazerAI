@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payi-proxy
+  labels:
+    app.kubernetes.io/name: payi-proxy
+    app.kubernetes.io/component: ai-proxy
+    app.kubernetes.io/part-of: trailblazer-ai
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: payi-proxy
