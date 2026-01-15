@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles } from 'lucide-react';
+import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, Route } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -25,6 +25,12 @@ const navItems: NavItem[] = [
     title: 'Sample Analysis',
     href: '/sample-analysis',
     icon: Sparkles,
+    public: true, // Visible without auth
+  },
+  {
+    title: 'Sample Route',
+    href: '/sample-route',
+    icon: Route,
     public: true, // Visible without auth
   },
   {
