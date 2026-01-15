@@ -137,12 +137,15 @@ model VehicleProfile {
 
 model TrailAnalysis {
   id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String?  // Nullable for demo analyses
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Optional vehicle used for analysis
   vehicleId       String?
   vehicle         VehicleProfile? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  // Flag for demo/sample analyses viewable without auth
+  isDemo          Boolean  @default(false)
 
   // Trail context
   trailName       String?
@@ -171,6 +174,7 @@ model TrailAnalysis {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([isDemo])
 }
 
 model AnalysisMetrics {
