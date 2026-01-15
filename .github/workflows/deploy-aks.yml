@@ -106,6 +106,7 @@ jobs:
             --from-literal=ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
             --from-literal=DATABASE_URL=${{ secrets.DATABASE_URL }} \
             --from-literal=AUTH_SECRET=${{ secrets.AUTH_SECRET }} \
+            --from-literal=NEXTAUTH_SECRET=${{ secrets.AUTH_SECRET }} \
             --from-literal=OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
             --from-literal=MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
