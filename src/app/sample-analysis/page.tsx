@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Target,
   Truck,
-  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import TrailAnalysisResults from '@/components/upload/TrailAnalysisResults';
