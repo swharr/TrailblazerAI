@@ -25,7 +25,13 @@ import {
   Satellite,
   Wifi,
   WifiOff,
-  PhoneCall
+  PhoneCall,
+  Building2,
+  TreePine,
+  Mountain as MountainIcon,
+  Shield,
+  Car,
+  Users
 } from 'lucide-react';
 
 interface TrailAnalysisResultsProps {
@@ -322,6 +328,135 @@ export default function TrailAnalysisResults({
                       {analysis.emergencyComms.emergencyFrequencies.notes && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {analysis.emergencyComms.emergencyFrequencies.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Local Authorities */}
+                {analysis.emergencyComms.localAuthorities && (
+                  <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-950/50 rounded-lg border border-purple-200 dark:border-purple-800">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Local Authorities & Agencies
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      {analysis.emergencyComms.localAuthorities.emergencyServices && (
+                        <div className="flex items-start gap-2">
+                          <PhoneCall className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium text-red-600 dark:text-red-400">Emergency: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.emergencyServices}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.sheriff && (
+                        <div className="flex items-start gap-2">
+                          <Shield className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">Sheriff: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.sheriff}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.searchAndRescue && (
+                        <div className="flex items-start gap-2">
+                          <Users className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">Search & Rescue: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.searchAndRescue}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.blm && (
+                        <div className="flex items-start gap-2">
+                          <Building2 className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">BLM: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.blm}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.nps && (
+                        <div className="flex items-start gap-2">
+                          <MountainIcon className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">NPS: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.nps}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.forestService && (
+                        <div className="flex items-start gap-2">
+                          <TreePine className="h-4 w-4 text-green-700 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">USFS: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.forestService}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.stateParks && (
+                        <div className="flex items-start gap-2">
+                          <TreePine className="h-4 w-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">State Parks: </span>
+                            <span>{analysis.emergencyComms.localAuthorities.stateParks}</span>
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.localAuthorities.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                          <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          {analysis.emergencyComms.localAuthorities.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recovery Services */}
+                {analysis.emergencyComms.recoveryServices && (
+                  <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-950/50 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <Car className="h-3 w-3" />
+                      Off-Road Recovery
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      {analysis.emergencyComms.recoveryServices.recommended && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Recommended Service</p>
+                          <p className="font-semibold text-amber-700 dark:text-amber-300">
+                            {analysis.emergencyComms.recoveryServices.recommended}
+                          </p>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.recoveryServices.alternates && analysis.emergencyComms.recoveryServices.alternates.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Alternate Services</p>
+                          <ul className="space-y-1">
+                            {analysis.emergencyComms.recoveryServices.alternates.map((alt, i) => (
+                              <li key={i} className="text-sm">{alt}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.recoveryServices.localClubs && analysis.emergencyComms.recoveryServices.localClubs.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Local 4x4 Clubs</p>
+                          <div className="flex flex-wrap gap-1">
+                            {analysis.emergencyComms.recoveryServices.localClubs.map((club, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300">
+                                {club}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {analysis.emergencyComms.recoveryServices.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                          <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          {analysis.emergencyComms.recoveryServices.notes}
                         </p>
                       )}
                     </div>

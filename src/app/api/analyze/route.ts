@@ -155,6 +155,34 @@ function parseAnalysisJson(text: string): TrailAnalysis {
         notes: parsed.emergencyComms.emergencyFrequencies.notes,
       };
     }
+
+    // Parse local authorities if present
+    if (parsed.emergencyComms.localAuthorities) {
+      analysis.emergencyComms.localAuthorities = {
+        sheriff: parsed.emergencyComms.localAuthorities.sheriff,
+        searchAndRescue: parsed.emergencyComms.localAuthorities.searchAndRescue,
+        blm: parsed.emergencyComms.localAuthorities.blm,
+        nps: parsed.emergencyComms.localAuthorities.nps,
+        forestService: parsed.emergencyComms.localAuthorities.forestService,
+        stateParks: parsed.emergencyComms.localAuthorities.stateParks,
+        emergencyServices: parsed.emergencyComms.localAuthorities.emergencyServices || '911',
+        notes: parsed.emergencyComms.localAuthorities.notes,
+      };
+    }
+
+    // Parse recovery services if present
+    if (parsed.emergencyComms.recoveryServices) {
+      analysis.emergencyComms.recoveryServices = {
+        recommended: parsed.emergencyComms.recoveryServices.recommended,
+        alternates: Array.isArray(parsed.emergencyComms.recoveryServices.alternates)
+          ? parsed.emergencyComms.recoveryServices.alternates
+          : [],
+        localClubs: Array.isArray(parsed.emergencyComms.recoveryServices.localClubs)
+          ? parsed.emergencyComms.recoveryServices.localClubs
+          : [],
+        notes: parsed.emergencyComms.recoveryServices.notes,
+      };
+    }
   }
 
   // Parse Starlink coverage if present

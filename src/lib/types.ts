@@ -79,6 +79,24 @@ export interface EmergencyComms {
     hamEmergency?: string; // e.g., "146.520 MHz (Ham Calling)"
     notes?: string;
   };
+  // Local authority contacts
+  localAuthorities?: {
+    sheriff?: string; // e.g., "Nye County Sheriff: (775) 482-8101"
+    searchAndRescue?: string;
+    blm?: string; // Bureau of Land Management office
+    nps?: string; // National Park Service
+    forestService?: string; // USFS
+    stateParks?: string;
+    emergencyServices?: string; // e.g., "911 (if cell coverage available)"
+    notes?: string;
+  };
+  // Off-road recovery services
+  recoveryServices?: {
+    recommended?: string; // e.g., "Vegas Off-Road Recovery: (702) 555-1234"
+    alternates?: string[];
+    localClubs?: string[]; // e.g., ["Nevada 4x4 Club", "High Desert Runners"]
+    notes?: string;
+  };
 }
 
 // Starlink satellite coverage assessment

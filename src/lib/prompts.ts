@@ -50,6 +50,22 @@ Return your analysis in this exact JSON format:
       "secondary": "<backup emergency option>",
       "hamEmergency": "<Ham emergency frequency if applicable, e.g., '146.520 MHz National Calling'>",
       "notes": "<local emergency services info if known>"
+    },
+    "localAuthorities": {
+      "sheriff": "<local sheriff office and phone if location known>",
+      "searchAndRescue": "<local SAR contact if known>",
+      "blm": "<BLM field office and contact if on BLM land>",
+      "nps": "<National Park Service contact if in/near national park>",
+      "forestService": "<USFS ranger district if in national forest>",
+      "stateParks": "<state park contact if applicable>",
+      "emergencyServices": "<911 or local emergency number>",
+      "notes": "<additional notes about contacting authorities>"
+    },
+    "recoveryServices": {
+      "recommended": "<recommended local off-road recovery service with contact info>",
+      "alternates": [<array of alternate recovery services>],
+      "localClubs": [<array of local 4x4/off-road clubs that may assist>],
+      "notes": "<tips for getting recovery help in this area>"
     }
   },
   "starlinkCoverage": {
@@ -135,6 +151,26 @@ Emergency Frequencies:
 - Ham 446.000 MHz: 70cm National Simplex Calling frequency
 - NOAA Weather: 162.400-162.550 MHz (receive only)
 - If location known, include local Search & Rescue or ranger frequencies
+
+Local Authority Contacts (if location is provided):
+- Include sheriff's office for the county/jurisdiction
+- BLM field office if on Bureau of Land Management land
+- NPS ranger station if in or near a National Park
+- USFS ranger district if in National Forest
+- Search & Rescue contact info if known
+- Always include 911 as primary emergency number (note cell coverage limitations)
+- Provide sat phone or InReach as backup for areas without cell coverage
+- Include agency-specific emergency lines where applicable
+
+Recovery Services & Local Clubs:
+- If location is known, recommend local off-road recovery services
+- Include contact phone numbers where available
+- Mention local 4x4 clubs or off-road groups that may provide mutual aid
+- Note Facebook groups, forums, or apps (like Ham radio nets) for reaching local off-roaders
+- Common recovery services by region:
+  - Always recommend having recovery insurance (Good Sam, AAA Plus RV, etc.)
+  - Satellite-based services: OnX Offroad, Garmin inReach SOS
+  - Note that commercial towing often won't go off-road
 
 Starlink Coverage Assessment:
 - High Performance: Clear sky view 100°+ in all directions, no obstructions above 25° elevation
