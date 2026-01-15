@@ -138,6 +138,7 @@ export default function SampleAnalysisPage() {
     recommendations: analysisData.recommendations,
     bestFor: analysisData.bestFor,
     summary: analysisData.summary,
+    rawResponse: '', // Not displayed in demo
     vehicleSettings: analysisData.vehicleSettings as TrailAnalysis['vehicleSettings'],
     fuelEstimate: analysisData.fuelEstimate as TrailAnalysis['fuelEstimate'],
     emergencyComms: analysisData.emergencyComms as TrailAnalysis['emergencyComms'],
