@@ -130,7 +130,7 @@ export function Sidebar() {
             <div className="px-4 py-4">
               <Separator className="mb-4" />
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">v0.1.0</p>
+                <p className="text-xs text-muted-foreground">v0.69.420</p>
                 <UserMenu />
               </div>
             </div>
@@ -154,7 +154,7 @@ export function Sidebar() {
         <div className="px-4 py-4">
           <Separator className="mb-4" />
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">v0.1.0</p>
+            <p className="text-xs text-muted-foreground">v0.69.420</p>
             <UserMenu />
           </div>
         </div>
