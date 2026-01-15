@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Map, MapPin, Download, Clock, Mountain, Route as RouteIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import RouteMap from '@/components/maps/RouteMap';
 
 interface RouteWaypoint {
   lat: number;
@@ -201,16 +202,22 @@ export default function SampleRoutePage() {
           <div className="space-y-4">
             <Card className="h-fit">
               <CardHeader>
-                <CardTitle>Map Preview</CardTitle>
-                <CardDescription>Interactive map coming soon</CardDescription>
+                <CardTitle>Route Map</CardTitle>
+                <CardDescription>View the route on an interactive map</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <Map className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Mapbox integration in progress</p>
-                  </div>
-                </div>
+                <RouteMap
+                  waypoints={route.waypoints.map((wp, index) => ({
+                    id: `wp-${index}`,
+                    lat: wp.lat,
+                    lng: wp.lng,
+                    elevation: wp.elevation,
+                    name: wp.name,
+                    type: wp.type as 'start' | 'end' | 'waypoint' | 'campsite' | 'water' | 'fuel' | 'hazard' | 'viewpoint',
+                  }))}
+                  editable={false}
+                  className="h-[400px]"
+                />
               </CardContent>
             </Card>
 
