@@ -9,6 +9,15 @@ import {
   buildTrailAnalysisJudgePrompt,
   evaluateJudgeResult,
 } from './judge-prompts';
+import { getPayiClient } from './payi-client';
+
+/** Map provider names to Pay-i category format */
+const PROVIDER_CATEGORIES: Record<string, string> = {
+  anthropic: 'system.anthropic',
+  openai: 'system.openai',
+  google: 'system.google',
+  xai: 'system.xai',
+};
 
 /**
  * Get the configured judge model client
@@ -78,16 +87,29 @@ function getDefaultModel(provider: string): string {
   return defaults[provider] || 'gpt-4o';
 }
 
+/** Response from judge model call including usage */
+interface JudgeModelResponse {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 /**
- * Call the judge model with a prompt
+ * Call the judge model with a prompt and track to Pay-i
  */
 async function callJudgeModel(
   judgeConfig: { provider: string; apiKey: string; model: string },
-  prompt: string
-): Promise<string> {
+  prompt: string,
+  context?: { validatedUseCaseName?: string; location?: string }
+): Promise<JudgeModelResponse> {
   const { provider, apiKey, model } = judgeConfig;
+  const startTime = Date.now();
 
   console.log(`[judge-service] Calling ${provider} judge model: ${model}`);
+
+  let text = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   switch (provider) {
     case 'anthropic': {
@@ -98,7 +120,10 @@ async function callJudgeModel(
         max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       });
-      return response.content[0].type === 'text' ? response.content[0].text : '';
+      text = response.content[0].type === 'text' ? response.content[0].text : '';
+      inputTokens = response.usage.input_tokens;
+      outputTokens = response.usage.output_tokens;
+      break;
     }
 
     case 'openai': {
@@ -109,7 +134,10 @@ async function callJudgeModel(
         max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       });
-      return response.choices[0]?.message?.content || '';
+      text = response.choices[0]?.message?.content || '';
+      inputTokens = response.usage?.prompt_tokens || 0;
+      outputTokens = response.usage?.completion_tokens || 0;
+      break;
     }
 
     case 'google': {
@@ -117,12 +145,50 @@ async function callJudgeModel(
       const client = new GoogleGenerativeAI(apiKey);
       const genModel = client.getGenerativeModel({ model });
       const result = await genModel.generateContent(prompt);
-      return result.response.text();
+      text = result.response.text();
+      // Google doesn't always provide token counts in the same way
+      const usageMetadata = result.response.usageMetadata;
+      inputTokens = usageMetadata?.promptTokenCount || 0;
+      outputTokens = usageMetadata?.candidatesTokenCount || 0;
+      break;
     }
 
     default:
       throw new Error(`Unsupported judge provider: ${provider}`);
   }
+
+  const latencyMs = Date.now() - startTime;
+
+  // Track to Pay-i
+  const payiClient = getPayiClient();
+  if (payiClient.isEnabled()) {
+    try {
+      await payiClient.ingest({
+        category: PROVIDER_CATEGORIES[provider] || `system.${provider}`,
+        resource: model,
+        units: {
+          text: {
+            input: inputTokens,
+            output: outputTokens,
+          },
+        },
+        use_case_name: 'judge_validation',
+        end_to_end_latency_ms: latencyMs,
+        use_case_properties: {
+          judge_provider: provider,
+          judge_model: model,
+          validated_use_case: context?.validatedUseCaseName || 'unknown',
+          ...(context?.location && { location: context.location }),
+        },
+      });
+      console.log(`[judge-service] Tracked to Pay-i: ${inputTokens} input, ${outputTokens} output tokens`);
+    } catch (payiError) {
+      console.error('[judge-service] Failed to track to Pay-i:', payiError);
+      // Don't fail the judge call if Pay-i tracking fails
+    }
+  }
+
+  return { text, inputTokens, outputTokens };
 }
 
 /**
@@ -226,10 +292,13 @@ export async function evaluateTrailFinderResponse(
 
     // Build and run judge prompt
     const judgePrompt = buildTrailFinderJudgePrompt(query, currentResponse);
-    const judgeResponse = await callJudgeModel(judgeConfig, judgePrompt);
+    const judgeResponse = await callJudgeModel(judgeConfig, judgePrompt, {
+      validatedUseCaseName: 'trail_finder',
+      location: query.location,
+    });
 
     try {
-      evaluation = parseJudgeResponse(judgeResponse);
+      evaluation = parseJudgeResponse(judgeResponse.text);
     } catch (error) {
       console.error('[judge-service] Failed to parse judge response:', error);
       // Return a cautious evaluation on parse failure
@@ -325,10 +394,13 @@ export async function evaluateTrailAnalysisResponse(
   }
 
   const judgePrompt = buildTrailAnalysisJudgePrompt(context, aiResponse);
-  const judgeResponse = await callJudgeModel(judgeConfig, judgePrompt);
+  const judgeResponse = await callJudgeModel(judgeConfig, judgePrompt, {
+    validatedUseCaseName: 'trail_analysis',
+    location: context.trailLocation,
+  });
 
   try {
-    const evaluation = parseJudgeResponse(judgeResponse);
+    const evaluation = parseJudgeResponse(judgeResponse.text);
     const thresholdResult = evaluateJudgeResult(evaluation);
     evaluation.passed = thresholdResult.passed;
 

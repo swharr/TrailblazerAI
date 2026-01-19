@@ -81,6 +81,15 @@ export async function POST(): Promise<NextResponse> {
         features: 'route_optimization,waypoint_suggestions,terrain_analysis',
       },
     },
+    {
+      use_case_name: 'judge_validation',
+      description: 'AI judge model for validating responses and detecting hallucinations',
+      properties: {
+        app: 'trailblazer_ai',
+        version: '1',
+        features: 'accuracy_check,hallucination_detection,source_verification',
+      },
+    },
   ];
 
   results.useCaseDefinitions = [];
@@ -175,6 +184,31 @@ export async function POST(): Promise<NextResponse> {
         kpi_name: 'route_distance',
         description: 'Total route distance in miles',
         value_type: 'numeric',
+      },
+    },
+    // judge_validation KPIs
+    {
+      useCaseName: 'judge_validation',
+      kpi: {
+        kpi_name: 'validation_passed',
+        description: 'Whether the AI response passed validation',
+        value_type: 'boolean',
+      },
+    },
+    {
+      useCaseName: 'judge_validation',
+      kpi: {
+        kpi_name: 'overall_score',
+        description: 'Overall quality score from 1-10',
+        value_type: 'numeric',
+      },
+    },
+    {
+      useCaseName: 'judge_validation',
+      kpi: {
+        kpi_name: 'hallucination_detected',
+        description: 'Whether hallucinations were detected',
+        value_type: 'boolean',
       },
     },
   ];
