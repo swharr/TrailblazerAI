@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Bot, Shield, Map, Eye, EyeOff, Check, AlertCircle, Users, Loader2, Search, ShieldCheck, ShieldX } from 'lucide-react';
+import { Bot, Shield, Map, Eye, EyeOff, Check, AlertCircle, Users, Loader2, Search, ShieldCheck, ShieldX, Activity, Play, RefreshCw } from 'lucide-react';
 
 interface ApiKeyFieldProps {
   id: string;
@@ -110,6 +110,13 @@ interface ProviderEditState {
   defaultModel?: string;
 }
 
+interface PayiStatus {
+  enabled: boolean;
+  useCases: Array<{ use_case_name: string; description?: string }>;
+  kpis: Array<{ kpi_name: string; description?: string; value_type: string }>;
+  limits: Array<{ limit_name: string; limit_id: string; max: number; threshold?: number }>;
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -136,6 +143,11 @@ export default function AdminPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+
+  // Pay-i state
+  const [payiStatus, setPayiStatus] = useState<PayiStatus | null>(null);
+  const [payiLoading, setPayiLoading] = useState(false);
+  const [payiRunningSetup, setPayiRunningSetup] = useState(false);
 
   // Fetch current settings
   const fetchSettings = useCallback(async () => {
@@ -192,6 +204,59 @@ export default function AdminPage() {
       console.error('Failed to load provider configs:', err);
     }
   }, []);
+
+  // Fetch Pay-i status
+  const fetchPayiStatus = useCallback(async () => {
+    setPayiLoading(true);
+    try {
+      const res = await fetch('/api/admin/payi-setup');
+      if (!res.ok) {
+        const data = await res.json();
+        if (data.error?.includes('not configured')) {
+          setPayiStatus({ enabled: false, useCases: [], kpis: [], limits: [] });
+          return;
+        }
+        throw new Error('Failed to fetch Pay-i status');
+      }
+
+      const data = await res.json();
+      setPayiStatus({
+        enabled: data.data?.enabled ?? false,
+        useCases: data.data?.useCases || [],
+        kpis: data.data?.kpis || [],
+        limits: data.data?.limits || [],
+      });
+    } catch (err) {
+      console.error('Failed to load Pay-i status:', err);
+      setPayiStatus({ enabled: false, useCases: [], kpis: [], limits: [] });
+    } finally {
+      setPayiLoading(false);
+    }
+  }, []);
+
+  // Run Pay-i setup
+  const runPayiSetup = async () => {
+    setPayiRunningSetup(true);
+    setError(null);
+    setSaveSuccess(null);
+
+    try {
+      const res = await fetch('/api/admin/payi-setup', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to run Pay-i setup');
+      }
+
+      setSaveSuccess('Pay-i setup completed successfully. Use cases and KPIs have been created.');
+      // Refresh status
+      fetchPayiStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run Pay-i setup');
+    } finally {
+      setPayiRunningSetup(false);
+    }
+  };
 
   // Save a single provider
   const saveProvider = async (provider: string) => {
@@ -443,10 +508,14 @@ export default function AdminPage() {
       )}
 
       <Tabs defaultValue="ai-models" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="ai-models" className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
             <span className="hidden sm:inline">AI Models</span>
+          </TabsTrigger>
+          <TabsTrigger value="payi" className="flex items-center gap-2" onClick={() => fetchPayiStatus()}>
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Pay-i</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -857,6 +926,152 @@ export default function AdminPage() {
                 {savingProvider === 'bedrock' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Save
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Pay-i Integration Tab */}
+        <TabsContent value="payi" className="space-y-6">
+          {/* Pay-i Status Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Pay-i Integration
+                {payiStatus?.enabled ? (
+                  <Badge variant="default">Connected</Badge>
+                ) : (
+                  <Badge variant="secondary">Not Configured</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Pay-i provides AI usage tracking, cost monitoring, and spend limits for your AI integrations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {payiLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : payiStatus?.enabled ? (
+                <>
+                  <Alert>
+                    <Check className="h-4 w-4" />
+                    <AlertDescription>
+                      Pay-i is connected and tracking AI usage. Configure environment variables <code>PAYI_BASE_URL</code> and <code>PAYI_API_KEY</code> in your deployment.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border p-4">
+                      <div className="text-sm font-medium text-muted-foreground">Use Cases</div>
+                      <div className="text-2xl font-bold">{payiStatus.useCases.length}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="text-sm font-medium text-muted-foreground">KPIs</div>
+                      <div className="text-2xl font-bold">{payiStatus.kpis.length}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="text-sm font-medium text-muted-foreground">Limits</div>
+                      <div className="text-2xl font-bold">{payiStatus.limits.length}</div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Use Cases */}
+                  {payiStatus.useCases.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Configured Use Cases</Label>
+                      <div className="rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Description</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {payiStatus.useCases.map((uc) => (
+                              <TableRow key={uc.use_case_name}>
+                                <TableCell className="font-mono text-sm">{uc.use_case_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{uc.description || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Limits */}
+                  {payiStatus.limits.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Spending Limits</Label>
+                      <div className="rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>ID</TableHead>
+                              <TableHead className="text-right">Max</TableHead>
+                              <TableHead className="text-right">Threshold</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {payiStatus.limits.map((limit) => (
+                              <TableRow key={limit.limit_id}>
+                                <TableCell>{limit.limit_name}</TableCell>
+                                <TableCell className="font-mono text-sm">{limit.limit_id}</TableCell>
+                                <TableCell className="text-right">${limit.max.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">{limit.threshold ? `$${limit.threshold.toFixed(2)}` : '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="flex gap-2">
+                    <Button onClick={runPayiSetup} disabled={payiRunningSetup}>
+                      {payiRunningSetup ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      Run Setup
+                    </Button>
+                    <Button variant="outline" onClick={fetchPayiStatus} disabled={payiLoading}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Status
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Run Setup creates use case definitions, KPIs, and default spending limits. Safe to run multiple times.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Pay-i is not configured. Add the following environment variables to enable AI usage tracking:
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="rounded-lg border p-4 bg-muted/50 space-y-2">
+                    <code className="block text-sm">PAYI_BASE_URL=https://api.pay-i.com</code>
+                    <code className="block text-sm">PAYI_API_KEY=sk-payi-app-xxx</code>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    Get your API credentials from the <a href="https://pay-i.com" target="_blank" rel="noopener noreferrer" className="underline">Pay-i dashboard</a>.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
