@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildTrailFinderPrompt, calculateVehicleCapabilityScore } from '@/lib/trail-finder-prompts';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { isPayiProxyEnabled, trailFinderViaPayiProxy } from '@/lib/payi-client';
+import { isPayiProxyEnabled, trailFinderViaPayiProxy, getPayiClient } from '@/lib/payi-client';
 import { Prisma } from '@prisma/client';
 import { evaluateTrailFinderResponse, isJudgeEnabled } from '@/lib/judge-service';
 
@@ -302,6 +302,31 @@ export async function POST(
       }
       inputTokens = response.usage.input_tokens;
       outputTokens = response.usage.output_tokens;
+
+      // Track to Pay-i via REST API (since we're not using the proxy)
+      const payiClient = getPayiClient();
+      if (payiClient.isEnabled()) {
+        payiClient.ingest({
+          category: 'system.anthropic',
+          resource: TRAIL_FINDER_MODEL,
+          units: {
+            text: {
+              input: inputTokens,
+              output: outputTokens,
+            },
+          },
+          use_case_name: 'trail_finder',
+          user_id: session.user?.email || undefined,
+          use_case_properties: useCaseProperties,
+          request_properties: {
+            search_radius: String(searchInput.searchRadius),
+            proxy_enabled: 'false',
+          },
+        }).catch((err) => {
+          console.error('[trail-finder] Failed to track to Pay-i:', err);
+        });
+        console.log('[trail-finder] Tracked to Pay-i via REST API');
+      }
     }
 
     // Parse the response
