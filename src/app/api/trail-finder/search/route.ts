@@ -48,13 +48,14 @@ function parseTrailFinderJson(text: string): {
   if (Array.isArray(parsed.recommendations)) {
     for (const rec of parsed.recommendations) {
       const validCompatibilities = ['excellent', 'good', 'marginal', 'not-recommended'];
-      const validSources = ['alltrails', 'onx', 'gaia', 'forum', 'other'];
+      const validSources = ['alltrails', 'onx', 'gaia', 'forum', 'web', 'other'];
 
       recommendations.push({
         name: rec.name || 'Unknown Trail',
         location: rec.location || '',
-        source: validSources.includes(rec.source) ? rec.source : 'other',
-        sourceUrl: rec.sourceUrl,
+        source: validSources.includes(rec.source) ? rec.source : 'web',
+        sourceName: rec.sourceName || undefined, // Human-readable source name for attribution
+        sourceUrl: rec.sourceUrl || undefined,
         difficulty: typeof rec.difficulty === 'number' ? rec.difficulty : 3,
         length: rec.length,
         elevationGain: rec.elevationGain,

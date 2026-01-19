@@ -366,7 +366,7 @@ export interface ComparisonResult {
 export type TrailDifficultyPref = 'easy' | 'moderate' | 'difficult' | 'any';
 export type TripLength = 'day-trip' | 'weekend' | 'multi-day';
 export type SceneryType = 'desert' | 'forest' | 'mountain' | 'coastal' | 'canyon' | 'prairie' | 'alpine' | 'wetland';
-export type TrailSource = 'alltrails' | 'onx' | 'gaia' | 'forum' | 'other';
+export type TrailSource = 'alltrails' | 'onx' | 'gaia' | 'forum' | 'web' | 'other';
 export type VehicleCompatibility = 'excellent' | 'good' | 'marginal' | 'not-recommended';
 
 export interface TrailSearchInput {
@@ -383,6 +383,7 @@ export interface TrailRecommendation {
   name: string;
   location: string;
   source: TrailSource;
+  sourceName?: string; // Human-readable source name (e.g., "Recreation.gov", "Expedition Portal")
   sourceUrl?: string;
   difficulty: number; // 1-5
   length?: string; // e.g., "12 miles"

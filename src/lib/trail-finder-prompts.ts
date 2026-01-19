@@ -265,7 +265,8 @@ Return a JSON object with this exact structure:
     {
       "name": "<trail name>",
       "location": "<specific location/area>",
-      "source": "<alltrails|onx|gaia|forum|other>",
+      "source": "<alltrails|onx|gaia|forum|web>",
+      "sourceName": "<human-readable source name for attribution>",
       "sourceUrl": "<direct URL to the trail page if available>",
       "difficulty": <1-5 rating>,
       "length": "<trail length, e.g., '12 miles'>",
@@ -304,11 +305,15 @@ Your response will be evaluated by a fact-checking system. Follow these rules st
    - Do NOT generate plausible-sounding trail names
    - If you cannot find enough trails, return fewer recommendations
 
-2. SOURCE URL RULES
-   - Only include URLs you actually found in search results
+2. SOURCE ATTRIBUTION RULES
+   - ALWAYS set sourceName to the actual website/source name for proper attribution
+   - For known platforms: "AllTrails", "OnX Offroad", "Gaia GPS"
+   - For forums: "Expedition Portal", "The New X", etc.
+   - For other websites: Use actual site name (e.g., "Recreation.gov", "BLM.gov", "Utah.com")
+   - NEVER use "other" without a sourceName - always attribute the actual source
+   - Only include sourceUrl if you actually found the URL in search results
    - If no direct URL was found, set sourceUrl to null
    - DO NOT fabricate URLs - they will be verified
-   - Format guidance only: AllTrails uses /trail/us/state/trail-name pattern
 
 3. UNCERTAINTY LANGUAGE
    - Use "approximately" for distances/elevations unless exact figures found

@@ -27,8 +27,21 @@ const SOURCE_LABELS: Record<TrailSource, { label: string; color: string }> = {
   onx: { label: 'OnX Offroad', color: 'bg-orange-500' },
   gaia: { label: 'Gaia GPS', color: 'bg-blue-500' },
   forum: { label: 'Forum', color: 'bg-purple-500' },
+  web: { label: 'Web Source', color: 'bg-teal-500' },
   other: { label: 'Other', color: 'bg-gray-500' },
 };
+
+/**
+ * Get display label for a trail source, using sourceName for proper attribution
+ */
+function getSourceLabel(trail: TrailRecommendation): string {
+  // If we have a custom source name, use it for attribution
+  if (trail.sourceName) {
+    return trail.sourceName;
+  }
+  // Fall back to the standard labels
+  return SOURCE_LABELS[trail.source]?.label || 'Unknown Source';
+}
 
 const COMPATIBILITY_STYLES: Record<VehicleCompatibility, { label: string; className: string }> = {
   excellent: { label: 'Excellent Match', className: 'bg-green-100 text-green-800 border-green-300' },
@@ -55,7 +68,8 @@ function DifficultyStars({ difficulty }: { difficulty: number }) {
 }
 
 function TrailCard({ trail }: { trail: TrailRecommendation }) {
-  const sourceInfo = SOURCE_LABELS[trail.source];
+  const sourceInfo = SOURCE_LABELS[trail.source] || SOURCE_LABELS.web;
+  const sourceLabel = getSourceLabel(trail);
   const compatibilityInfo = COMPATIBILITY_STYLES[trail.vehicleCompatibility];
 
   return (
@@ -66,7 +80,7 @@ function TrailCard({ trail }: { trail: TrailRecommendation }) {
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-lg">{trail.name}</CardTitle>
               <Badge variant="outline" className={cn('text-xs text-white', sourceInfo.color)}>
-                {sourceInfo.label}
+                {sourceLabel}
               </Badge>
             </div>
             <CardDescription className="flex items-center gap-1">
@@ -163,7 +177,7 @@ function TrailCard({ trail }: { trail: TrailRecommendation }) {
           <Button variant="outline" size="sm" asChild className="w-full">
             <a href={trail.sourceUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-4 w-4 mr-2" />
-              View on {sourceInfo.label}
+              View on {sourceLabel}
             </a>
           </Button>
         )}
