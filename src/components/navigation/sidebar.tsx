@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, MapPin, Compass } from 'lucide-react';
+import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, MapPin, Compass, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -22,98 +22,115 @@ interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  public?: boolean;
+}
+
+interface NavSection {
+  title: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  items: NavItem[];
+  requiresAuth?: boolean;
   adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
+const navSections: NavSection[] = [
   {
-    title: 'Sample Trail Analysis',
-    href: '/sample-analysis',
-    icon: Sparkles,
-    public: true, // Visible without auth
+    title: 'Samples',
+    icon: FlaskConical,
+    items: [
+      { title: 'Trail Analysis', href: '/sample-analysis', icon: Sparkles },
+      { title: 'Route Planner', href: '/sample-route', icon: MapPin },
+      { title: 'Trail Finder', href: '/sample-trail-finder', icon: Compass },
+    ],
   },
   {
-    title: 'Sample Route Plan',
-    href: '/sample-route',
-    icon: MapPin,
-    public: true, // Visible without auth
-  },
-  {
-    title: 'Sample Trail Finder',
-    href: '/sample-trail-finder',
-    icon: Compass,
-    public: true, // Visible without auth
-  },
-  {
-    title: 'Analyze',
-    href: '/analyze',
-    icon: Camera,
-  },
-  {
-    title: 'Trail Finder',
-    href: '/trail-finder',
-    icon: Compass,
-  },
-  {
-    title: 'Plan Routes',
-    href: '/plan',
-    icon: Map,
-  },
-  {
-    title: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    title: 'Settings',
-    href: '/settings',
-    icon: Settings,
+    title: 'Features',
+    requiresAuth: true,
+    items: [
+      { title: 'Analyze Trail', href: '/analyze', icon: Camera },
+      { title: 'Find Trails', href: '/trail-finder', icon: Compass },
+      { title: 'Plan Routes', href: '/plan', icon: Map },
+      { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { title: 'Settings', href: '/settings', icon: Settings },
+    ],
   },
   {
     title: 'Admin',
-    href: '/admin',
-    icon: ShieldCheck,
     adminOnly: true,
+    items: [
+      { title: 'Admin Panel', href: '/admin', icon: ShieldCheck },
+    ],
   },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin';
+  const isAuthenticated = !!session?.user;
 
-  // Filter nav items based on user role
-  const visibleItems = navItems.filter((item) => {
-    // Hide admin-only items for non-admin users
-    if (item.adminOnly) {
-      return session?.user?.role === 'admin';
-    }
+  // Filter sections based on user role and auth status
+  const visibleSections = navSections.filter((section) => {
+    if (section.adminOnly) return isAdmin;
     return true;
   });
 
   return (
-    <nav className="flex flex-col gap-2">
-      {visibleItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = pathname === item.href;
+    <nav className="flex flex-col gap-4">
+      {visibleSections.map((section, sectionIndex) => (
+        <div key={section.title}>
+          {/* Section Header */}
+          <div className="flex items-center gap-2 px-3 py-1 mb-1">
+            {section.icon && <section.icon className="h-4 w-4 text-muted-foreground" />}
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {section.title}
+            </span>
+          </div>
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-secondary hover:text-secondary-foreground'
-            )}
-          >
-            <Icon className="h-5 w-5" />
-            {item.title}
-          </Link>
-        );
-      })}
+          {/* Section Items */}
+          <div className="flex flex-col gap-1">
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              const isDisabled = section.requiresAuth && !isAuthenticated;
+
+              if (isDisabled) {
+                return (
+                  <div
+                    key={item.href}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/50 cursor-not-allowed"
+                    title="Sign in to access"
+                  >
+                    <Icon className="h-5 w-5" />
+                    {item.title}
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-secondary-foreground'
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.title}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Add separator between sections (except last) */}
+          {sectionIndex < visibleSections.length - 1 && (
+            <Separator className="mt-3" />
+          )}
+        </div>
+      ))}
     </nav>
   );
 }
