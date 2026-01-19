@@ -7,9 +7,7 @@ import {
   JudgeEvaluation,
   buildTrailFinderJudgePrompt,
   buildTrailAnalysisJudgePrompt,
-  buildImprovementPrompt,
   evaluateJudgeResult,
-  JUDGE_THRESHOLDS,
 } from './judge-prompts';
 
 /**
