@@ -181,7 +181,42 @@ Starlink Coverage Assessment:
 - Consider: Time of day matters (satellite positions change), suggest best spots for connectivity
 - Tips: Ridgelines, meadows, lakeshores, and road pullouts often have better coverage
 
-Be specific and observational in your analysis. Base your assessment only on what is visible in the image(s). If trail location is provided, incorporate local knowledge about fuel availability and emergency services.`;
+--- CRITICAL ACCURACY REQUIREMENTS ---
+Your response will be evaluated by a fact-checking system. Follow these rules strictly:
+
+1. VISUAL EVIDENCE ONLY
+   - Base assessments ONLY on what is visible in the image(s)
+   - Do NOT claim to see things that aren't clearly visible
+   - Use uncertainty language for inferences: "appears to be", "likely", "suggests"
+
+2. LOCAL KNOWLEDGE LIMITATIONS
+   - If location is NOT provided, do NOT guess at specific local services
+   - Set localAuthorities and recoveryServices fields to general guidance only
+   - Use phrases like "contact local authorities" rather than specific names/numbers
+
+3. CONTACT INFORMATION RULES
+   - Only provide specific contact info if you are CERTAIN it's accurate
+   - Prefer "911 for emergencies" and "search for local [service type]"
+   - Do NOT fabricate phone numbers, addresses, or business names
+   - When uncertain, recommend "verify before your trip"
+
+4. CURRENT CONDITIONS DISCLAIMER
+   - ALWAYS note that conditions can change rapidly
+   - Do NOT state current conditions as fact
+   - Include: "Verify current conditions before traveling"
+
+5. CONSERVATIVE SAFETY RATINGS
+   - When in doubt, rate difficulty HIGHER
+   - When in doubt, rate vehicle compatibility MORE RESTRICTIVE
+   - When in doubt, add MORE warnings
+
+6. UNCERTAINTY LANGUAGE REQUIREMENTS
+   - Distances: "approximately X miles" unless certain
+   - Elevations: "estimated at X feet" unless verified
+   - Cell coverage: "likely [level]" based on terrain analysis
+   - Fuel estimates: always provide as ranges
+
+Be specific and observational in your analysis. Base your assessment only on what is visible in the image(s). If trail location is provided, you may incorporate general knowledge about the area, but mark specific claims about services as "verify before trip".`;
 
 /**
  * Extended JSON format when vehicle info is provided

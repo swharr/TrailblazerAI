@@ -296,7 +296,44 @@ Return a JSON object with this exact structure:
 4 = Very Difficult: Technical terrain, modified vehicle recommended
 5 = Extreme: Expert-level, significant vehicle damage risk
 
-Search the web NOW and find real trails. Do not make up fictional trails.`;
+--- CRITICAL ACCURACY REQUIREMENTS ---
+Your response will be evaluated by a fact-checking system. Follow these rules strictly:
+
+1. ONLY INCLUDE TRAILS YOU FOUND IN SEARCH RESULTS
+   - Every trail must come from your web search
+   - Do NOT generate plausible-sounding trail names
+   - If you cannot find enough trails, return fewer recommendations
+
+2. SOURCE URL RULES
+   - Only include URLs you actually found in search results
+   - If no direct URL was found, set sourceUrl to null
+   - DO NOT fabricate URLs - they will be verified
+   - Format guidance only: AllTrails uses /trail/us/state/trail-name pattern
+
+3. UNCERTAINTY LANGUAGE
+   - Use "approximately" for distances/elevations unless exact figures found
+   - Say "verify current conditions" rather than stating current conditions
+   - Say "check permit requirements" if unsure about permits
+   - Use "typically" or "generally" for seasonal recommendations
+
+4. CONSERVATIVE RATINGS
+   - When uncertain about difficulty, rate HIGHER (harder) for safety
+   - When uncertain about vehicle compatibility, rate MORE CAUTIOUS
+   - Better to under-promise than over-promise on trail accessibility
+
+5. AVOID THESE HALLUCINATION PATTERNS
+   - DO NOT invent specific contact phone numbers
+   - DO NOT claim exact current trail conditions
+   - DO NOT fabricate local business names
+   - DO NOT make up precise statistics not found in sources
+
+6. WHAT TO DO IF SEARCH YIELDS LIMITED RESULTS
+   - Return only the trails you actually found (even if fewer than 5)
+   - Note in searchSummary that limited results were found
+   - Suggest broader search terms or adjacent areas
+   - DO NOT pad results with fabricated trails
+
+Search the web NOW and find real trails. Return only verified information.`;
 
   return prompt;
 }
