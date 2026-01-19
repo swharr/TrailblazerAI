@@ -163,6 +163,11 @@ jobs:
             --from-literal=MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }} \
             --from-literal=PAYI_BASE_URL="${{ secrets.PAYI_BASE_URL }}" \
             --from-literal=PAYI_API_KEY="${{ secrets.PAYI_API_KEY }}" \
+            --from-literal=ANTHROPIC_ENCRYPTED_KEY="${{ secrets.ANTHROPIC_ENCRYPTED_KEY }}" \
+            --from-literal=OPENAI_ENCRYPTED_KEY="${{ secrets.OPENAI_ENCRYPTED_KEY }}" \
+            --from-literal=GOOGLE_ENCRYPTED_KEY="${{ secrets.GOOGLE_ENCRYPTED_KEY }}" \
+            --from-literal=XAI_ENCRYPTED_KEY="${{ secrets.XAI_ENCRYPTED_KEY }}" \
+            --from-literal=BEDROCK_ENCRYPTED_KEY="${{ secrets.BEDROCK_ENCRYPTED_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Restart deployments to pick up secrets
