@@ -10,13 +10,13 @@ const ALGORITHM = 'aes-256-gcm';
  * Key must be 32 bytes (256 bits) encoded as base64.
  */
 function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
+  const key = process.env.OPENAI_ENCRYPTED_KEY;
   if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is required');
+    throw new Error('OPENAI_ENCRYPTED_KEY environment variable is required');
   }
   const buffer = Buffer.from(key, 'base64');
   if (buffer.length !== 32) {
-    throw new Error('ENCRYPTION_KEY must be 32 bytes (256 bits) base64 encoded');
+    throw new Error('OPENAI_ENCRYPTED_KEY must be 32 bytes (256 bits) base64 encoded');
   }
   return buffer;
 }
