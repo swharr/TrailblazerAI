@@ -9,7 +9,15 @@ import {
   buildTrailAnalysisJudgePrompt,
   evaluateJudgeResult,
 } from './judge-prompts';
-import { isPayiProxyEnabled, judgeViaPayiProxy } from './payi-client';
+import { isPayiProxyEnabled, judgeViaPayiProxy, getPayiClient } from './payi-client';
+
+/** Map provider names to Pay-i category format */
+const PROVIDER_CATEGORIES: Record<string, string> = {
+  anthropic: 'system.anthropic',
+  openai: 'system.openai',
+  google: 'system.google',
+  xai: 'system.xai',
+};
 
 /**
  * Get the configured judge model client
@@ -185,7 +193,33 @@ async function callJudgeModel(
       throw new Error(`Unsupported judge provider: ${provider}`);
   }
 
-  console.log(`[judge-service] Direct call complete: ${inputTokens} input, ${outputTokens} output tokens (no Pay-i tracking via proxy)`);
+  console.log(`[judge-service] Direct call complete: ${inputTokens} input, ${outputTokens} output tokens`);
+
+  // Track to Pay-i via REST API (fallback when proxy not available)
+  const payiClient = getPayiClient();
+  if (payiClient.isEnabled()) {
+    payiClient.ingest({
+      category: PROVIDER_CATEGORIES[provider] || `system.${provider}`,
+      resource: model,
+      units: {
+        text: {
+          input: inputTokens,
+          output: outputTokens,
+        },
+      },
+      use_case_name: 'judge_validation',
+      use_case_properties: {
+        judge_provider: provider,
+        judge_model: model,
+        validated_use_case: context?.validatedUseCaseName || 'unknown',
+        ...(context?.location && { location: context.location }),
+      },
+    }).then(() => {
+      console.log(`[judge-service] Tracked to Pay-i via REST API: ${inputTokens} input, ${outputTokens} output tokens`);
+    }).catch((err) => {
+      console.error('[judge-service] Failed to track to Pay-i:', err);
+    });
+  }
 
   return { text, inputTokens, outputTokens };
 }
