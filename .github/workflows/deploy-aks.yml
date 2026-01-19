@@ -171,18 +171,14 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          # Delete any existing migration pod from previous runs
-          kubectl delete pod prisma-migrate -n trailblazer-ai --ignore-not-found
+          # Install dependencies for migration
+          npm ci --ignore-scripts
 
-          # Run migrations using a temporary pod with the new image
-          kubectl run prisma-migrate \
-            --namespace trailblazer-ai \
-            --image=${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }} \
-            --restart=Never \
-            --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --rm -i \
-            --command -- npx prisma migrate deploy
+          # Run Prisma migrations
+          npx prisma migrate deploy
 
           echo "Migration completed successfully"
 
