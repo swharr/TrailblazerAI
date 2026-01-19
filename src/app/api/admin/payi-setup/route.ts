@@ -325,9 +325,24 @@ export async function GET(): Promise<NextResponse> {
   const useCases = await client.getUseCaseDefinitions();
   results.useCases = useCases?.items || [];
 
-  // Get KPIs for trail_analysis
-  const kpis = await client.getKpis('trail_analysis');
-  results.kpis = kpis?.items || [];
+  // Get KPIs for all use cases
+  const allKpis: Array<{ useCaseName: string; kpi_name: string; description?: string; value_type: string }> = [];
+  const useCaseNames = ['trail_analysis', 'trail_finder', 'trail_planner', 'judge_validation'];
+
+  for (const ucName of useCaseNames) {
+    const kpis = await client.getKpis(ucName);
+    if (kpis?.items) {
+      for (const kpi of kpis.items) {
+        allKpis.push({
+          useCaseName: ucName,
+          kpi_name: kpi.kpi_name,
+          description: kpi.description,
+          value_type: kpi.value_type,
+        });
+      }
+    }
+  }
+  results.kpis = allKpis;
 
   // Get all limits
   const limits = await client.getLimits();

@@ -933,3 +933,79 @@ export async function trailFinderViaPayiProxy(
 
   return data;
 }
+
+// Judge Proxy Types
+export interface PayiProxyJudgeRequest {
+  prompt: string;
+  provider?: string;
+  model?: string;
+  max_tokens?: number;
+  user_id?: string;
+  validated_use_case?: string;
+  location?: string;
+  use_case_name?: string;
+  use_case_version?: number;
+  use_case_properties?: Record<string, string>;
+}
+
+export interface PayiProxyJudgeResponse {
+  success: boolean;
+  text: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cost?: number;
+    input_cost?: number;
+    output_cost?: number;
+  };
+  use_case_id: string;
+  payi_request_id?: string;
+  error?: string;
+}
+
+/**
+ * Call the Pay-i proxy service for judge validation with full instrumentation
+ */
+export async function judgeViaPayiProxy(
+  request: PayiProxyJudgeRequest
+): Promise<PayiProxyJudgeResponse> {
+  const config = getPayiProxyConfig();
+
+  if (!config.enabled) {
+    throw new Error('Pay-i proxy is not configured');
+  }
+
+  const url = `${config.baseUrl}/judge`;
+
+  console.log('[Pay-i Proxy] Calling judge endpoint:', {
+    url,
+    provider: request.provider,
+    model: request.model,
+    validatedUseCase: request.validated_use_case,
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Pay-i Proxy] Judge request failed:', response.status, errorText);
+    throw new Error(`Pay-i proxy error: ${response.status} - ${errorText}`);
+  }
+
+  const data = (await response.json()) as PayiProxyJudgeResponse;
+
+  console.log('[Pay-i Proxy] Judge response received:', {
+    success: data.success,
+    inputTokens: data.usage.input_tokens,
+    outputTokens: data.usage.output_tokens,
+    useCaseId: data.use_case_id,
+  });
+
+  return data;
+}

@@ -112,8 +112,8 @@ interface ProviderEditState {
 
 interface PayiStatus {
   enabled: boolean;
-  useCases: Array<{ use_case_name: string; description?: string }>;
-  kpis: Array<{ kpi_name: string; description?: string; value_type: string }>;
+  useCases: Array<{ use_case_name: string; description?: string; properties?: Record<string, string> }>;
+  kpis: Array<{ useCaseName: string; kpi_name: string; description?: string; value_type: string }>;
   limits: Array<{ limit_name: string; limit_id: string; max: number; threshold?: number }>;
 }
 
@@ -1007,13 +1007,52 @@ export default function AdminPage() {
                             <TableRow>
                               <TableHead>Name</TableHead>
                               <TableHead>Description</TableHead>
+                              <TableHead>Features</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {payiStatus.useCases.map((uc) => (
                               <TableRow key={uc.use_case_name}>
-                                <TableCell className="font-mono text-sm">{uc.use_case_name}</TableCell>
-                                <TableCell className="text-muted-foreground">{uc.description || '-'}</TableCell>
+                                <TableCell className="font-mono text-sm font-medium">{uc.use_case_name}</TableCell>
+                                <TableCell className="text-muted-foreground max-w-xs">{uc.description || '-'}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {uc.properties?.features?.split(',').map((f, i) => (
+                                    <Badge key={i} variant="outline" className="mr-1 mb-1">{f.trim()}</Badge>
+                                  )) || '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* KPIs */}
+                  {payiStatus.kpis.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>KPIs by Use Case</Label>
+                      <div className="rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Use Case</TableHead>
+                              <TableHead>KPI Name</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Description</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {payiStatus.kpis.map((kpi, idx) => (
+                              <TableRow key={`${kpi.useCaseName}-${kpi.kpi_name}-${idx}`}>
+                                <TableCell className="font-mono text-xs">{kpi.useCaseName}</TableCell>
+                                <TableCell className="font-mono text-sm">{kpi.kpi_name}</TableCell>
+                                <TableCell>
+                                  <Badge variant={kpi.value_type === 'boolean' ? 'secondary' : 'outline'}>
+                                    {kpi.value_type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">{kpi.description || '-'}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

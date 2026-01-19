@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     payi_api_key: str = ""
     payi_base_url: str = "https://api.pay-i.com"
 
-    # Anthropic Configuration
+    # AI Provider Configuration
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    google_api_key: str = ""
 
     # Service Configuration
     service_name: str = "trailblazer-payi-proxy"

@@ -9,15 +9,7 @@ import {
   buildTrailAnalysisJudgePrompt,
   evaluateJudgeResult,
 } from './judge-prompts';
-import { getPayiClient } from './payi-client';
-
-/** Map provider names to Pay-i category format */
-const PROVIDER_CATEGORIES: Record<string, string> = {
-  anthropic: 'system.anthropic',
-  openai: 'system.openai',
-  google: 'system.google',
-  xai: 'system.xai',
-};
+import { isPayiProxyEnabled, judgeViaPayiProxy } from './payi-client';
 
 /**
  * Get the configured judge model client
@@ -96,16 +88,52 @@ interface JudgeModelResponse {
 
 /**
  * Call the judge model with a prompt and track to Pay-i
+ * Prefers using the Pay-i proxy for full instrumentation
  */
 async function callJudgeModel(
   judgeConfig: { provider: string; apiKey: string; model: string },
   prompt: string,
   context?: { validatedUseCaseName?: string; location?: string }
 ): Promise<JudgeModelResponse> {
-  const { provider, apiKey, model } = judgeConfig;
-  const startTime = Date.now();
+  const { provider, model } = judgeConfig;
 
-  console.log(`[judge-service] Calling ${provider} judge model: ${model}`);
+  // Prefer using the proxy for full Pay-i instrumentation
+  if (isPayiProxyEnabled()) {
+    console.log(`[judge-service] Using Pay-i proxy for judge evaluation: ${provider}/${model}`);
+    try {
+      const proxyResponse = await judgeViaPayiProxy({
+        prompt,
+        provider,
+        model,
+        max_tokens: 4096,
+        validated_use_case: context?.validatedUseCaseName,
+        location: context?.location,
+        use_case_name: 'judge_validation',
+        use_case_version: 1,
+        use_case_properties: {
+          judge_provider: provider,
+          judge_model: model,
+          validated_use_case: context?.validatedUseCaseName || 'unknown',
+          ...(context?.location && { location: context.location }),
+        },
+      });
+
+      console.log(`[judge-service] Proxy response: ${proxyResponse.usage.input_tokens} input, ${proxyResponse.usage.output_tokens} output tokens`);
+
+      return {
+        text: proxyResponse.text,
+        inputTokens: proxyResponse.usage.input_tokens,
+        outputTokens: proxyResponse.usage.output_tokens,
+      };
+    } catch (proxyError) {
+      console.error('[judge-service] Proxy call failed, falling back to direct call:', proxyError);
+      // Fall through to direct API call
+    }
+  }
+
+  // Fallback: Direct API call (no Pay-i proxy instrumentation)
+  const { apiKey } = judgeConfig;
+  console.log(`[judge-service] Direct call to ${provider} judge model: ${model}`);
 
   let text = '';
   let inputTokens = 0;
@@ -157,36 +185,7 @@ async function callJudgeModel(
       throw new Error(`Unsupported judge provider: ${provider}`);
   }
 
-  const latencyMs = Date.now() - startTime;
-
-  // Track to Pay-i
-  const payiClient = getPayiClient();
-  if (payiClient.isEnabled()) {
-    try {
-      await payiClient.ingest({
-        category: PROVIDER_CATEGORIES[provider] || `system.${provider}`,
-        resource: model,
-        units: {
-          text: {
-            input: inputTokens,
-            output: outputTokens,
-          },
-        },
-        use_case_name: 'judge_validation',
-        end_to_end_latency_ms: latencyMs,
-        use_case_properties: {
-          judge_provider: provider,
-          judge_model: model,
-          validated_use_case: context?.validatedUseCaseName || 'unknown',
-          ...(context?.location && { location: context.location }),
-        },
-      });
-      console.log(`[judge-service] Tracked to Pay-i: ${inputTokens} input, ${outputTokens} output tokens`);
-    } catch (payiError) {
-      console.error('[judge-service] Failed to track to Pay-i:', payiError);
-      // Don't fail the judge call if Pay-i tracking fails
-    }
-  }
+  console.log(`[judge-service] Direct call complete: ${inputTokens} input, ${outputTokens} output tokens (no Pay-i tracking via proxy)`);
 
   return { text, inputTokens, outputTokens };
 }

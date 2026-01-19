@@ -24,6 +24,8 @@ from models import (
     HealthResponse,
     TrailFinderRequest,
     TrailFinderResponse,
+    JudgeRequest,
+    JudgeResponse,
 )
 
 # Configure logging
@@ -393,6 +395,150 @@ async def trail_finder(
         raise HTTPException(status_code=e.status_code or 500, detail=str(e))
     except Exception as e:
         logger.error(f"Trail finder error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def run_judge_evaluation(
+    prompt: str,
+    provider: str,
+    model: str,
+    max_tokens: int,
+    requesting_user_id: Optional[str] = None,
+    use_case_name: str = "judge_validation",
+    use_case_version: int = 1,
+    use_case_properties: Optional[dict] = None,
+) -> tuple[str, dict]:
+    """
+    Run judge evaluation using the specified provider with Pay-i tracking.
+
+    Supports multiple providers: anthropic, openai, google
+    """
+    logger.info(f"Starting Pay-i tracked judge evaluation with provider={provider}, model={model}")
+
+    # Build context kwargs
+    context_kwargs = {
+        "use_case_name": use_case_name,
+        "user_id": requesting_user_id,
+        "use_case_properties": use_case_properties or {},
+        "request_properties": {
+            "judge_provider": provider,
+            "judge_model": model,
+        },
+    }
+    context_kwargs["use_case_version"] = use_case_version
+
+    text = ""
+    input_tokens = 0
+    output_tokens = 0
+
+    with track_context(**context_kwargs):
+        if provider == "anthropic":
+            if anthropic_client is None:
+                raise HTTPException(status_code=503, detail="Anthropic client not initialized")
+            response = anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text if response.content[0].type == "text" else ""
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+
+        elif provider == "openai":
+            import openai
+            settings = get_settings()
+            if not settings.openai_api_key:
+                raise HTTPException(status_code=503, detail="OpenAI API key not configured")
+            client = openai.OpenAI(api_key=settings.openai_api_key)
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.choices[0].message.content or ""
+            input_tokens = response.usage.prompt_tokens if response.usage else 0
+            output_tokens = response.usage.completion_tokens if response.usage else 0
+
+        elif provider == "google":
+            import google.generativeai as genai
+            settings = get_settings()
+            if not settings.google_api_key:
+                raise HTTPException(status_code=503, detail="Google API key not configured")
+            genai.configure(api_key=settings.google_api_key)
+            gen_model = genai.GenerativeModel(model)
+            response = gen_model.generate_content(prompt)
+            text = response.text
+            # Google provides usage metadata differently
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                input_tokens = response.usage_metadata.prompt_token_count or 0
+                output_tokens = response.usage_metadata.candidates_token_count or 0
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
+
+        # Get context for use_case_id
+        ctx = get_context()
+        use_case_id = ctx.get("use_case_id", str(uuid.uuid4()))
+
+        return text, {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "use_case_id": use_case_id,
+        }
+
+
+@app.post("/judge", response_model=JudgeResponse)
+async def judge_validation(
+    request: JudgeRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Run judge validation with full Pay-i instrumentation.
+
+    This endpoint:
+    - Creates a new use case instance for each validation
+    - Tracks token usage and costs automatically
+    - Supports multiple AI providers (anthropic, openai, google)
+    """
+    logger.info(f"Received judge request: provider={request.provider}, model={request.model}")
+
+    # Build use case properties
+    use_case_properties = request.use_case_properties or {}
+    use_case_properties["judge_provider"] = request.provider
+    use_case_properties["judge_model"] = request.model
+    if request.validated_use_case:
+        use_case_properties["validated_use_case"] = request.validated_use_case
+    if request.location:
+        use_case_properties["location"] = request.location
+
+    try:
+        text, metrics = run_judge_evaluation(
+            prompt=request.prompt,
+            provider=request.provider,
+            model=request.model,
+            max_tokens=request.max_tokens,
+            requesting_user_id=request.user_id,
+            use_case_name=request.use_case_name,
+            use_case_version=request.use_case_version,
+            use_case_properties=use_case_properties,
+        )
+
+        logger.info(f"Judge evaluation complete: {metrics['input_tokens']} input, {metrics['output_tokens']} output tokens")
+
+        return JudgeResponse(
+            success=True,
+            text=text,
+            usage=UsageMetrics(
+                input_tokens=metrics["input_tokens"],
+                output_tokens=metrics["output_tokens"],
+            ),
+            use_case_id=metrics["use_case_id"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Judge evaluation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
