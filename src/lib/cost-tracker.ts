@@ -40,12 +40,22 @@ export const MODEL_COSTS: Record<
  * @returns Cost in dollars
  */
 export function calculateCost(
-  model: ModelName,
+  model: string,
   inputTokens: number,
   outputTokens: number
 ): number {
-  const pricing = MODEL_COSTS[model];
+  const pricing = MODEL_COSTS[model as ModelName];
   if (!pricing) {
+    // Try to match Bedrock model patterns
+    if (model.startsWith('anthropic.claude-3-5-sonnet')) {
+      return calculateCost('claude-3-5-sonnet-20241022', inputTokens, outputTokens);
+    }
+    if (model.startsWith('anthropic.claude-3-sonnet')) {
+      return calculateCost('claude-3-5-sonnet-20241022', inputTokens, outputTokens); // Similar pricing
+    }
+    if (model.startsWith('anthropic.claude-3-haiku')) {
+      return calculateCost('claude-3-5-haiku-20241022', inputTokens, outputTokens);
+    }
     console.warn(`Unknown model: ${model}, defaulting to zero cost`);
     return 0;
   }
@@ -182,13 +192,13 @@ export function getTotalCost(): number {
  * Helper for creating metrics entries
  */
 export function createMetric(
-  model: ModelName,
+  model: string,
   inputTokens: number,
   outputTokens: number,
   latency: number
 ): AnalysisMetrics {
   return {
-    model,
+    model: model as ModelName,
     inputTokens,
     outputTokens,
     cost: calculateCost(model, inputTokens, outputTokens),

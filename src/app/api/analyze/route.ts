@@ -4,14 +4,14 @@ import type {
   AnalysisResult,
   TrailAnalysis,
   AnalysisMetrics,
-  ModelName,
   VehicleInfo,
   AnalysisContext,
 } from '@/lib/types';
+import { getProviderClient, ProviderName } from '@/lib/model-clients';
 import AnthropicClient from '@/lib/model-clients/anthropic';
 import { buildAnalysisPrompt } from '@/lib/prompts';
 import { trackMetric, calculateCost } from '@/lib/cost-tracker';
-import { ModelError, RateLimitError } from '@/lib/model-clients/base';
+import { ModelError, RateLimitError, ModelProvider } from '@/lib/model-clients/base';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
@@ -23,13 +23,49 @@ import {
   analyzeViaPayiProxy,
 } from '@/lib/payi-client';
 
-/** Supported models for image analysis */
-const SUPPORTED_VISION_MODELS: ModelName[] = [
-  'claude-sonnet-4-20250514',
-  'claude-opus-4-20250514',
-  'claude-3-5-sonnet-20241022',
-  'claude-3-5-haiku-20241022',
-];
+/** Supported vision models by provider */
+const SUPPORTED_VISION_MODELS: Record<ProviderName, string[]> = {
+  anthropic: [
+    'claude-sonnet-4-20250514',
+    'claude-opus-4-20250514',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022',
+  ],
+  openai: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+  ],
+  google: [
+    'gemini-2.0-flash',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+  ],
+  xai: [
+    'grok-2-vision',
+    'grok-2-vision-1212',
+  ],
+  bedrock: [
+    'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'anthropic.claude-3-sonnet-20240229-v1:0',
+    'anthropic.claude-3-haiku-20240307-v1:0',
+  ],
+};
+
+/** Get all supported vision model names */
+function getAllSupportedModels(): string[] {
+  return Object.values(SUPPORTED_VISION_MODELS).flat();
+}
+
+/** Get provider for a model name */
+function getProviderForModel(model: string): ProviderName | null {
+  for (const [provider, models] of Object.entries(SUPPORTED_VISION_MODELS)) {
+    if (models.includes(model)) {
+      return provider as ProviderName;
+    }
+  }
+  return null;
+}
 
 /** Maximum file size per image (32MB for high-resolution images) */
 const MAX_FILE_SIZE = 32 * 1024 * 1024;
@@ -428,12 +464,13 @@ export async function POST(
       );
     }
 
-    const model = modelParam as ModelName;
+    const model = modelParam;
 
-    // Check if model is supported for vision
-    if (!SUPPORTED_VISION_MODELS.includes(model)) {
+    // Get provider for this model
+    const providerName = getProviderForModel(model);
+    if (!providerName) {
       // Check if it's a known model but doesn't support vision
-      const nonVisionModels: ModelName[] = ['gemini-pro'];
+      const nonVisionModels = ['gemini-pro', 'o1', 'o1-mini', 'grok-2'];
       if (nonVisionModels.includes(model)) {
         console.log('[analyze] Error: Model does not support vision:', model);
         return NextResponse.json(
@@ -445,29 +482,17 @@ export async function POST(
         );
       }
 
-      // Check if it's a model we haven't implemented yet
-      const notImplementedModels: ModelName[] = [
-        'gpt-4o',
-        'gpt-4-turbo',
-        'gemini-pro-vision',
-      ];
-      if (notImplementedModels.includes(model)) {
-        console.log('[analyze] Error: Model not yet implemented:', model);
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Model ${model} is not yet implemented. Currently supported: ${SUPPORTED_VISION_MODELS.join(', ')}`,
-          },
-          { status: 501, headers: getCorsHeaders() }
-        );
-      }
-
       console.log('[analyze] Error: Unknown model:', model);
       return NextResponse.json(
-        { success: false, error: `Unknown model: ${model}` },
+        {
+          success: false,
+          error: `Unknown model: ${model}. Supported models: ${getAllSupportedModels().join(', ')}`,
+        },
         { status: 400, headers: getCorsHeaders() }
       );
     }
+
+    console.log('[analyze] Model', model, 'uses provider:', providerName);
 
     // Convert all images to base64
     console.log('[analyze] Converting', images.length, 'image(s) to base64...');
@@ -475,68 +500,96 @@ export async function POST(
     console.log('[analyze] Base64 conversion complete, total length:', base64Images.reduce((sum, b64) => sum + b64.length, 0));
 
     // Create appropriate client based on model
-    console.log('[analyze] Creating client for model:', model);
+    console.log('[analyze] Creating client for model:', model, 'provider:', providerName);
     let response: { text: string; usage: { inputTokens: number; outputTokens: number } };
     let proxyUseCaseId: string | undefined;
 
-    // Check if model is an Anthropic model
-    const isAnthropicModel =
-      model === 'claude-sonnet-4-20250514' ||
-      model === 'claude-opus-4-20250514' ||
-      model === 'claude-3-5-sonnet-20241022' ||
-      model === 'claude-3-5-haiku-20241022';
+    // Build the full analysis prompt
+    const prompt = buildAnalysisPrompt(vehicleInfo, context);
 
-    if (isAnthropicModel) {
-      // Build the full analysis prompt (same prompt regardless of proxy or direct)
-      const prompt = buildAnalysisPrompt(vehicleInfo, context);
+    // Check if Pay-i proxy is enabled for Anthropic models (full instrumentation)
+    const isAnthropicModel = providerName === 'anthropic';
+    if (isAnthropicModel && isPayiProxyEnabled()) {
+      console.log('[analyze] Using Pay-i proxy for full instrumentation');
 
-      // Check if Pay-i proxy is enabled for full instrumentation
-      if (isPayiProxyEnabled()) {
-        console.log('[analyze] Using Pay-i proxy for full instrumentation');
-        const proxyResponse = await analyzeViaPayiProxy({
-          images: base64Images,
-          model,
-          prompt, // Pass the full prompt to the proxy
-          vehicle_info: vehicleInfo
-            ? {
-                make: vehicleInfo.make,
-                model: vehicleInfo.model,
-                year: vehicleInfo.year,
-                features: vehicleInfo.features,
-                suspension_brand: vehicleInfo.suspensionBrand,
-                suspension_travel: vehicleInfo.suspensionTravel,
-              }
-            : undefined,
-          context: context
-            ? {
-                trail_name: context.trailName,
-                trail_location: context.trailLocation,
-                additional_notes: context.additionalNotes,
-              }
-            : undefined,
-          user_id: session.user?.email || undefined,
-        });
+      // Build use case properties for Pay-i attribution
+      const useCaseProperties: Record<string, string> = {};
+      if (context?.trailName) useCaseProperties.trail_name = context.trailName;
+      if (context?.trailLocation) useCaseProperties.trail_location = context.trailLocation;
+      if (vehicleInfo?.make) useCaseProperties.vehicle_make = vehicleInfo.make;
+      if (vehicleInfo?.model) useCaseProperties.vehicle_model = vehicleInfo.model;
+      if (vehicleInfo?.year) useCaseProperties.vehicle_year = String(vehicleInfo.year);
 
-        response = {
-          text: proxyResponse.text,
-          usage: {
-            inputTokens: proxyResponse.usage.input_tokens,
-            outputTokens: proxyResponse.usage.output_tokens,
-          },
-        };
-        proxyUseCaseId = proxyResponse.use_case_id;
-      } else {
-        // Direct Anthropic call with REST API tracking
-        const client = new AnthropicClient();
-        console.log('[analyze] Calling Anthropic API with', base64Images.length, 'image(s)...');
-        response = await client.analyzeImages(base64Images, prompt);
-      }
+      // Build request properties
+      const requestProperties: Record<string, string> = {
+        image_count: String(images.length),
+        model_used: model,
+        has_vehicle_info: String(!!vehicleInfo),
+        has_context: String(!!context),
+      };
+
+      const proxyResponse = await analyzeViaPayiProxy({
+        images: base64Images,
+        model,
+        prompt,
+        vehicle_info: vehicleInfo
+          ? {
+              make: vehicleInfo.make,
+              model: vehicleInfo.model,
+              year: vehicleInfo.year,
+              features: vehicleInfo.features,
+              suspension_brand: vehicleInfo.suspensionBrand,
+              suspension_travel: vehicleInfo.suspensionTravel,
+            }
+          : undefined,
+        context: context
+          ? {
+              trail_name: context.trailName,
+              trail_location: context.trailLocation,
+              additional_notes: context.additionalNotes,
+            }
+          : undefined,
+        user_id: session.user?.email || undefined,
+        use_case_name: 'trail_analysis',
+        use_case_version: 2,
+        use_case_properties: useCaseProperties,
+        request_properties: requestProperties,
+      });
+
+      response = {
+        text: proxyResponse.text,
+        usage: {
+          inputTokens: proxyResponse.usage.input_tokens,
+          outputTokens: proxyResponse.usage.output_tokens,
+        },
+      };
+      proxyUseCaseId = proxyResponse.use_case_id;
     } else {
-      // This shouldn't happen due to earlier validation, but just in case
-      return NextResponse.json(
-        { success: false, error: 'Model not yet implemented' },
-        { status: 501, headers: getCorsHeaders() }
-      );
+      // Get the provider client from the factory
+      let client: ModelProvider | null = null;
+
+      // Try to get client from database config first
+      client = await getProviderClient(providerName);
+
+      // Fallback to direct instantiation for Anthropic if no DB config
+      if (!client && providerName === 'anthropic') {
+        console.log('[analyze] Falling back to env-based Anthropic client');
+        client = new AnthropicClient();
+      }
+
+      if (!client) {
+        console.log('[analyze] Error: Provider not configured:', providerName);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Provider ${providerName} is not configured. Please add API credentials in the admin panel.`,
+          },
+          { status: 400, headers: getCorsHeaders() }
+        );
+      }
+
+      console.log('[analyze] Calling', providerName, 'API with', base64Images.length, 'image(s)...');
+      response = await client.analyzeImages(base64Images, prompt);
     }
 
     const latency = Date.now() - startTime;

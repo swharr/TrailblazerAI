@@ -27,7 +27,7 @@ export type ModelName =
 
 export interface ModelConfig {
   provider: ModelProvider;
-  name: ModelName;
+  name: string; // Model identifier (e.g., 'claude-sonnet-4-20250514', 'gpt-4o')
   displayName: string;
   supportsVision: boolean;
   costPer1kInputTokens: number;
@@ -221,7 +221,7 @@ export interface Message {
 }
 
 export interface AnalysisMetrics {
-  model: ModelName;
+  model: string; // Model identifier (supports dynamic model names)
   inputTokens: number;
   outputTokens: number;
   cost: number;

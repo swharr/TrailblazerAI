@@ -585,8 +585,13 @@ export default function AdminPage() {
                   <SelectContent>
                     <SelectItem value="claude-sonnet-4-20250514">Claude Sonnet 4 (Recommended)</SelectItem>
                     <SelectItem value="claude-opus-4-20250514">Claude Opus 4</SelectItem>
-                    <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</SelectItem>
+                    <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</SelectItem>
+                    <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet v2</SelectItem>
+                    <SelectItem value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet v1</SelectItem>
                     <SelectItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</SelectItem>
+                    <SelectItem value="claude-3-opus-20240229">Claude 3 Opus</SelectItem>
+                    <SelectItem value="claude-3-sonnet-20240229">Claude 3 Sonnet</SelectItem>
+                    <SelectItem value="claude-3-haiku-20240307">Claude 3 Haiku</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -661,9 +666,18 @@ export default function AdminPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gpt-4o">GPT-4o (Recommended)</SelectItem>
+                    <SelectItem value="gpt-4o-2024-11-20">GPT-4o (Nov 2024)</SelectItem>
+                    <SelectItem value="gpt-4o-2024-08-06">GPT-4o (Aug 2024)</SelectItem>
                     <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast)</SelectItem>
+                    <SelectItem value="gpt-4o-mini-2024-07-18">GPT-4o Mini (Jul 2024)</SelectItem>
                     <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                    <SelectItem value="gpt-4-turbo-2024-04-09">GPT-4 Turbo (Apr 2024)</SelectItem>
+                    <SelectItem value="gpt-4-0125-preview">GPT-4 Preview</SelectItem>
                     <SelectItem value="o1">o1 (Reasoning)</SelectItem>
+                    <SelectItem value="o1-2024-12-17">o1 (Dec 2024)</SelectItem>
+                    <SelectItem value="o1-mini">o1 Mini</SelectItem>
+                    <SelectItem value="o1-mini-2024-09-12">o1 Mini (Sep 2024)</SelectItem>
+                    <SelectItem value="o3-mini">o3 Mini (Latest)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -738,8 +752,14 @@ export default function AdminPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</SelectItem>
+                    <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
+                    <SelectItem value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking</SelectItem>
+                    <SelectItem value="gemini-exp-1206">Gemini Experimental (Dec 2024)</SelectItem>
                     <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                    <SelectItem value="gemini-1.5-pro-002">Gemini 1.5 Pro 002</SelectItem>
                     <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                    <SelectItem value="gemini-1.5-flash-002">Gemini 1.5 Flash 002</SelectItem>
+                    <SelectItem value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B (Fast)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -806,19 +826,17 @@ export default function AdminPage() {
               <div className="space-y-2">
                 <Label>Default Model</Label>
                 <Select
-                  value={getProviderValue('xai', 'defaultModel') ?? 'grok-3'}
+                  value={getProviderValue('xai', 'defaultModel') ?? 'grok-2-vision-1212'}
                   onValueChange={(v) => updateProviderEdit('xai', 'defaultModel', v)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="grok-3">Grok 3 (Recommended)</SelectItem>
-                    <SelectItem value="grok-3-fast">Grok 3 Fast</SelectItem>
-                    <SelectItem value="grok-4-1">Grok 4.1</SelectItem>
-                    <SelectItem value="grok-4-1-fast-reasoning">Grok 4.1 Fast Reasoning</SelectItem>
-                    <SelectItem value="grok-2-vision">Grok 2 Vision</SelectItem>
-                    <SelectItem value="grok-2-image">Grok 2 Image</SelectItem>
+                    <SelectItem value="grok-2-vision-1212">Grok 2 Vision (Recommended)</SelectItem>
+                    <SelectItem value="grok-2-1212">Grok 2 (Dec 2024)</SelectItem>
+                    <SelectItem value="grok-vision-beta">Grok Vision Beta</SelectItem>
+                    <SelectItem value="grok-beta">Grok Beta</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

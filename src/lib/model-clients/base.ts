@@ -41,6 +41,14 @@ export interface ModelProvider {
   analyzeImage(imageBase64: string, prompt: string): Promise<AnalysisResponse>;
 
   /**
+   * Analyze multiple images and return structured analysis results
+   * @param imagesBase64 - Array of base64 encoded image data
+   * @param prompt - The analysis prompt to send with the images
+   * @returns Promise resolving to analysis text and token usage
+   */
+  analyzeImages(imagesBase64: string[], prompt: string): Promise<AnalysisResponse>;
+
+  /**
    * Send a chat conversation to the model
    * @param messages - Array of conversation messages
    * @param stream - Optional flag to enable streaming responses

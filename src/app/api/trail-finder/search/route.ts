@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildTrailFinderPrompt, calculateVehicleCapabilityScore } from '@/lib/trail-finder-prompts';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { generateUseCaseId, trackTrailFinderUsage, trackTrailFinderSuccess } from '@/lib/payi-client';
+import { isPayiProxyEnabled, trailFinderViaPayiProxy } from '@/lib/payi-client';
 import { Prisma } from '@prisma/client';
 
 /** Default model for trail search (needs web search capability) */
@@ -209,56 +209,97 @@ export async function POST(
     // Build the prompt
     const prompt = buildTrailFinderPrompt(searchInput);
 
-    // Track timing and generate use case ID for Pay-i
-    const startTime = Date.now();
-    const useCaseId = generateUseCaseId();
+    // Build use case properties for Pay-i tracking
+    const useCaseProperties: Record<string, string> = {
+      location: searchInput.location,
+      difficulty_pref: searchInput.difficultyPref || 'any',
+      trip_length: searchInput.tripLength || 'any',
+      has_vehicle: vehicleInfo ? 'true' : 'false',
+    };
+    if (vehicleInfo?.make) useCaseProperties.vehicle_make = vehicleInfo.make;
+    if (vehicleInfo?.model) useCaseProperties.vehicle_model = vehicleInfo.model;
 
-    // Create Anthropic client with web search enabled
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.error('[trail-finder] No Anthropic API key configured');
-      return NextResponse.json(
-        { success: false, error: 'API key not configured' },
-        { status: 500, headers: getCorsHeaders() }
-      );
-    }
-
-    const client = new Anthropic({ apiKey });
-
-    console.log('[trail-finder] Calling Anthropic API with web search...');
-
-    // Call Anthropic with web search tool
-    const response = await client.messages.create({
-      model: TRAIL_FINDER_MODEL,
-      max_tokens: MAX_TOKENS,
-      tools: [
-        {
-          type: 'web_search_20250305',
-          name: 'web_search',
-          max_uses: 10,
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    });
-
-    console.log('[trail-finder] API response received:', {
-      stopReason: response.stop_reason,
-      contentBlocks: response.content.length,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-    });
-
-    // Extract text from response (may include multiple content blocks with web search)
     let responseText = '';
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        responseText += block.text;
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    // Check if Pay-i proxy is enabled - route ALL calls through proxy for instrumentation
+    if (isPayiProxyEnabled()) {
+      console.log('[trail-finder] Using Pay-i proxy for trail search...');
+
+      const proxyResponse = await trailFinderViaPayiProxy({
+        prompt,
+        model: TRAIL_FINDER_MODEL,
+        max_tokens: MAX_TOKENS,
+        user_id: session.user?.email || undefined,
+        use_case_name: 'trail_finder',
+        use_case_version: 1,
+        use_case_properties: useCaseProperties,
+        request_properties: {
+          search_radius: String(searchInput.searchRadius),
+        },
+      });
+
+      responseText = proxyResponse.text;
+      inputTokens = proxyResponse.usage.input_tokens;
+      outputTokens = proxyResponse.usage.output_tokens;
+
+      console.log('[trail-finder] Proxy response received:', {
+        inputTokens,
+        outputTokens,
+        useCaseId: proxyResponse.use_case_id,
+      });
+    } else {
+      // Fallback: Direct Anthropic call (no Pay-i instrumentation)
+      console.log('[trail-finder] Pay-i proxy not enabled, using direct Anthropic call');
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        console.error('[trail-finder] No Anthropic API key configured');
+        return NextResponse.json(
+          { success: false, error: 'API key not configured' },
+          { status: 500, headers: getCorsHeaders() }
+        );
       }
+
+      const client = new Anthropic({ apiKey });
+
+      console.log('[trail-finder] Calling Anthropic API with web search...');
+
+      // Call Anthropic with web search tool
+      const response = await client.messages.create({
+        model: TRAIL_FINDER_MODEL,
+        max_tokens: MAX_TOKENS,
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 10,
+          },
+        ],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      console.log('[trail-finder] API response received:', {
+        stopReason: response.stop_reason,
+        contentBlocks: response.content.length,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      });
+
+      // Extract text from response
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          responseText += block.text;
+        }
+      }
+      inputTokens = response.usage.input_tokens;
+      outputTokens = response.usage.output_tokens;
     }
 
     // Parse the response
@@ -287,35 +328,8 @@ export async function POST(
     // Calculate capability score (use our calculation for consistency)
     const capabilityScore = calculateVehicleCapabilityScore(vehicleInfo);
 
-    // Track usage with Pay-i (fire and forget)
-    const latencyMs = Date.now() - startTime;
-    trackTrailFinderUsage({
-      model: TRAIL_FINDER_MODEL,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      latencyMs,
-      userId: session.user?.email || undefined,
-      useCaseId,
-      useCaseProperties: {
-        location: searchInput.location,
-        difficulty_pref: searchInput.difficultyPref || 'any',
-        trip_length: searchInput.tripLength || 'any',
-        has_vehicle: vehicleInfo ? 'true' : 'false',
-      },
-      requestProperties: {
-        result_count: String(parsed.recommendations.length),
-        search_radius: String(searchInput.searchRadius),
-        capability_score: String(capabilityScore),
-      },
-    });
-
-    // Track success KPIs with Pay-i (fire and forget)
-    trackTrailFinderSuccess({
-      useCaseId,
-      resultCount: parsed.recommendations.length,
-      location: searchInput.location,
-      hasVehicleInfo: !!vehicleInfo,
-    });
+    // Note: Pay-i tracking is handled automatically by the proxy when PAYI_PROXY_URL is set
+    // No manual tracking needed here
 
     // Build result
     const result: TrailSearchResult = {

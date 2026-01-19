@@ -22,6 +22,8 @@ from models import (
     AnalyzeResponse,
     UsageMetrics,
     HealthResponse,
+    TrailFinderRequest,
+    TrailFinderResponse,
 )
 
 # Configure logging
@@ -105,6 +107,8 @@ def analyze_trail_images(
     prompt: str,
     model: str,
     requesting_user_id: Optional[str] = None,
+    use_case_name: str = "trail_analysis",
+    use_case_version: Optional[int] = None,
     use_case_properties: Optional[dict] = None,
     request_properties: Optional[dict] = None,
 ) -> tuple[str, dict]:
@@ -120,13 +124,20 @@ def analyze_trail_images(
     if anthropic_client is None:
         raise HTTPException(status_code=503, detail="Anthropic client not initialized")
 
+    logger.info(f"Starting Pay-i tracked analysis with use_case_name={use_case_name}")
+
+    # Build context kwargs
+    context_kwargs = {
+        "use_case_name": use_case_name,
+        "user_id": requesting_user_id,
+        "use_case_properties": use_case_properties or {},
+        "request_properties": request_properties or {},
+    }
+    if use_case_version is not None:
+        context_kwargs["use_case_version"] = use_case_version
+
     # Use track_context for request-specific properties
-    with track_context(
-        use_case_name="trail_analysis",
-        user_id=requesting_user_id,
-        use_case_properties=use_case_properties or {},
-        request_properties=request_properties or {},
-    ):
+    with track_context(**context_kwargs):
         # Build message content with images
         content = []
         for image_data in images:
@@ -202,26 +213,36 @@ async def analyze(
         prompt = build_analysis_prompt(request)
         logger.info("Using fallback basic prompt")
 
-    # Build use case properties from request context
-    use_case_properties = {}
-    if request.context:
-        if request.context.trail_name:
-            use_case_properties["trail_name"] = request.context.trail_name
-        if request.context.trail_location:
-            use_case_properties["trail_location"] = request.context.trail_location
-    if request.vehicle_info:
-        use_case_properties["vehicle_make"] = request.vehicle_info.make
-        use_case_properties["vehicle_model"] = request.vehicle_info.model
-        if request.vehicle_info.year:
-            use_case_properties["vehicle_year"] = str(request.vehicle_info.year)
+    # Use properties from request if provided, otherwise build from context
+    if request.use_case_properties:
+        use_case_properties = request.use_case_properties
+    else:
+        use_case_properties = {}
+        if request.context:
+            if request.context.trail_name:
+                use_case_properties["trail_name"] = request.context.trail_name
+            if request.context.trail_location:
+                use_case_properties["trail_location"] = request.context.trail_location
+        if request.vehicle_info:
+            use_case_properties["vehicle_make"] = request.vehicle_info.make
+            use_case_properties["vehicle_model"] = request.vehicle_info.model
+            if request.vehicle_info.year:
+                use_case_properties["vehicle_year"] = str(request.vehicle_info.year)
 
-    # Build request properties
-    request_properties = {
-        "image_count": str(len(request.images)),
-        "model_used": request.model,
-        "has_vehicle_info": str(request.vehicle_info is not None),
-        "has_context": str(request.context is not None),
-    }
+    # Use request properties from request if provided, otherwise build defaults
+    if request.request_properties:
+        request_properties = request.request_properties
+    else:
+        request_properties = {
+            "image_count": str(len(request.images)),
+            "model_used": request.model,
+            "has_vehicle_info": str(request.vehicle_info is not None),
+            "has_context": str(request.context is not None),
+        }
+
+    # Get use case name from request or default to trail_analysis
+    use_case_name = request.use_case_name or "trail_analysis"
+    logger.info(f"Using use_case_name: {use_case_name}, version: {request.use_case_version}")
 
     try:
         # Call the tracked analysis function
@@ -230,6 +251,8 @@ async def analyze(
             prompt=prompt,
             model=request.model,
             requesting_user_id=request.user_id,
+            use_case_name=use_case_name,
+            use_case_version=request.use_case_version,
             use_case_properties=use_case_properties,
             request_properties=request_properties,
         )
@@ -251,6 +274,125 @@ async def analyze(
         raise HTTPException(status_code=e.status_code or 500, detail=str(e))
     except Exception as e:
         logger.error(f"Analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def search_trails(
+    prompt: str,
+    model: str,
+    max_tokens: int,
+    requesting_user_id: Optional[str] = None,
+    use_case_name: str = "trail_finder",
+    use_case_version: Optional[int] = None,
+    use_case_properties: Optional[dict] = None,
+    request_properties: Optional[dict] = None,
+) -> tuple[str, dict]:
+    """
+    Search for trails using Anthropic with web search and Pay-i tracking.
+
+    Uses track_context to:
+    - Create a use case instance with unique ID
+    - Track all AI calls within this context
+    - Capture token usage and costs
+    - Associate properties with the use case
+    """
+    if anthropic_client is None:
+        raise HTTPException(status_code=503, detail="Anthropic client not initialized")
+
+    logger.info(f"Starting Pay-i tracked trail search with use_case_name={use_case_name}")
+
+    # Build context kwargs
+    context_kwargs = {
+        "use_case_name": use_case_name,
+        "user_id": requesting_user_id,
+        "use_case_properties": use_case_properties or {},
+        "request_properties": request_properties or {},
+    }
+    if use_case_version is not None:
+        context_kwargs["use_case_version"] = use_case_version
+
+    # Use track_context for request-specific properties
+    with track_context(**context_kwargs):
+        # Make the API call with web search tool (automatically instrumented by Pay-i)
+        response = anthropic_client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            tools=[
+                {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 10,
+                },
+            ],
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        # Extract text from response (may include multiple content blocks with web search)
+        text = ""
+        for block in response.content:
+            if block.type == "text":
+                text += block.text
+
+        # Get context for use_case_id
+        ctx = get_context()
+        use_case_id = ctx.get("use_case_id", str(uuid.uuid4()))
+
+        return text, {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "use_case_id": use_case_id,
+        }
+
+
+@app.post("/trail-finder", response_model=TrailFinderResponse)
+async def trail_finder(
+    request: TrailFinderRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Search for trails using web search with full Pay-i instrumentation.
+
+    This endpoint:
+    - Creates a new use case instance for each search
+    - Tracks token usage and costs automatically
+    - Uses web search to find trails from AllTrails, OnX, etc.
+    """
+    logger.info(f"Received trail finder request, model={request.model}")
+
+    # Get use case name from request or default
+    use_case_name = request.use_case_name or "trail_finder"
+    logger.info(f"Using use_case_name: {use_case_name}, version: {request.use_case_version}")
+
+    try:
+        # Call the tracked search function
+        text, metrics = search_trails(
+            prompt=request.prompt,
+            model=request.model,
+            max_tokens=request.max_tokens,
+            requesting_user_id=request.user_id,
+            use_case_name=use_case_name,
+            use_case_version=request.use_case_version,
+            use_case_properties=request.use_case_properties,
+            request_properties=request.request_properties,
+        )
+
+        logger.info(f"Trail search complete: {metrics['input_tokens']} input, {metrics['output_tokens']} output tokens")
+
+        return TrailFinderResponse(
+            success=True,
+            text=text,
+            usage=UsageMetrics(
+                input_tokens=metrics["input_tokens"],
+                output_tokens=metrics["output_tokens"],
+            ),
+            use_case_id=metrics["use_case_id"],
+        )
+
+    except anthropic.APIError as e:
+        logger.error(f"Anthropic API error: {e}")
+        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Trail finder error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -589,6 +589,17 @@ export async function trackTrailAnalysisSuccess(params: {
 }): Promise<void> {
   const client = getPayiClient();
   if (client.isEnabled()) {
+    // First, create the use case instance (required before KPI updates)
+    const instance = await client.createUseCaseInstance('trail_analysis', {
+      use_case_id: params.useCaseId,
+      use_case_version: 2,
+    });
+
+    if (!instance) {
+      console.warn('[Pay-i] Failed to create use case instance, skipping KPI updates');
+      return;
+    }
+
     // Update the analysis_success KPI
     client
       .updateKpiScore('trail_analysis', params.useCaseId, 'analysis_success', {
@@ -758,9 +769,45 @@ export interface PayiProxyAnalyzeRequest {
   user_id?: string;
   account_name?: string;
   limit_ids?: string[];
+  /** Use case name for Pay-i attribution */
+  use_case_name?: string;
+  /** Use case version */
+  use_case_version?: number;
+  /** Custom use case properties */
+  use_case_properties?: Record<string, string>;
+  /** Custom request properties */
+  request_properties?: Record<string, string>;
 }
 
 export interface PayiProxyAnalyzeResponse {
+  success: boolean;
+  text: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cost?: number;
+    input_cost?: number;
+    output_cost?: number;
+  };
+  use_case_id: string;
+  payi_request_id?: string;
+  error?: string;
+}
+
+// Trail Finder Proxy Types
+export interface PayiProxyTrailFinderRequest {
+  prompt: string;
+  model?: string;
+  max_tokens?: number;
+  user_id?: string;
+  account_name?: string;
+  use_case_name?: string;
+  use_case_version?: number;
+  use_case_properties?: Record<string, string>;
+  request_properties?: Record<string, string>;
+}
+
+export interface PayiProxyTrailFinderResponse {
   success: boolean;
   text: string;
   usage: {
@@ -832,6 +879,52 @@ export async function analyzeViaPayiProxy(
   const data = (await response.json()) as PayiProxyAnalyzeResponse;
 
   console.log('[Pay-i Proxy] Response received:', {
+    success: data.success,
+    inputTokens: data.usage.input_tokens,
+    outputTokens: data.usage.output_tokens,
+    useCaseId: data.use_case_id,
+  });
+
+  return data;
+}
+
+/**
+ * Call the Pay-i proxy service for trail finder search with full instrumentation
+ */
+export async function trailFinderViaPayiProxy(
+  request: PayiProxyTrailFinderRequest
+): Promise<PayiProxyTrailFinderResponse> {
+  const config = getPayiProxyConfig();
+
+  if (!config.enabled) {
+    throw new Error('Pay-i proxy is not configured');
+  }
+
+  const url = `${config.baseUrl}/trail-finder`;
+
+  console.log('[Pay-i Proxy] Calling trail-finder endpoint:', {
+    url,
+    model: request.model,
+    hasProperties: !!request.use_case_properties,
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Pay-i Proxy] Trail finder request failed:', response.status, errorText);
+    throw new Error(`Pay-i proxy error: ${response.status} - ${errorText}`);
+  }
+
+  const data = (await response.json()) as PayiProxyTrailFinderResponse;
+
+  console.log('[Pay-i Proxy] Trail finder response received:', {
     success: data.success,
     inputTokens: data.usage.input_tokens,
     outputTokens: data.usage.output_tokens,

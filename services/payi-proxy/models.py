@@ -32,6 +32,11 @@ class AnalyzeRequest(BaseModel):
     user_id: Optional[str] = Field(None, description="User ID for tracking")
     account_name: Optional[str] = Field(None, description="Account name for grouping")
     limit_ids: list[str] = Field(default_factory=list, description="Limit IDs to apply")
+    # Pay-i attribution fields
+    use_case_name: Optional[str] = Field(None, description="Use case name for Pay-i attribution")
+    use_case_version: Optional[int] = Field(None, description="Use case version")
+    use_case_properties: Optional[dict[str, str]] = Field(None, description="Custom use case properties")
+    request_properties: Optional[dict[str, str]] = Field(None, description="Custom request properties")
 
 
 class UsageMetrics(BaseModel):
@@ -59,3 +64,28 @@ class HealthResponse(BaseModel):
     service: str
     payi_enabled: bool
     anthropic_enabled: bool
+
+
+# Trail Finder Models
+class TrailFinderRequest(BaseModel):
+    """Request body for trail finder search."""
+    prompt: str = Field(..., description="The trail finder prompt")
+    model: str = Field(default="claude-sonnet-4-20250514", description="Model to use")
+    max_tokens: int = Field(default=4096, description="Maximum tokens for response")
+    user_id: Optional[str] = Field(None, description="User ID for tracking")
+    account_name: Optional[str] = Field(None, description="Account name for grouping")
+    # Pay-i attribution fields
+    use_case_name: Optional[str] = Field(default="trail_finder", description="Use case name")
+    use_case_version: Optional[int] = Field(default=1, description="Use case version")
+    use_case_properties: Optional[dict[str, str]] = Field(None, description="Custom use case properties")
+    request_properties: Optional[dict[str, str]] = Field(None, description="Custom request properties")
+
+
+class TrailFinderResponse(BaseModel):
+    """Response from trail finder search."""
+    success: bool
+    text: str = Field(default="", description="Raw response text from the model")
+    usage: UsageMetrics
+    use_case_id: str = Field(..., description="Unique use case instance ID")
+    payi_request_id: Optional[str] = Field(None, description="Pay-i request ID")
+    error: Optional[str] = None
