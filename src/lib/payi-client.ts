@@ -600,6 +600,132 @@ export async function trackTrailAnalysisSuccess(params: {
   }
 }
 
+/**
+ * Track a Trail Finder search using the singleton client
+ */
+export async function trackTrailFinderUsage(params: {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  userId?: string;
+  accountName?: string;
+  useCaseId?: string;
+  useCaseVersion?: number;
+  limitIds?: string[];
+  useCaseProperties?: Record<string, string>;
+  requestProperties?: Record<string, string>;
+  httpStatus?: number;
+}): Promise<PayiIngestResponse | null> {
+  const client = getPayiClient();
+  if (client.isEnabled()) {
+    return client.trackAnthropicCall({
+      ...params,
+      useCaseName: 'trail_finder',
+    }).catch((err) => {
+      console.error('[Pay-i] Failed to track trail finder usage:', err);
+      return null;
+    });
+  }
+  return null;
+}
+
+/**
+ * Track a successful trail finder search with KPI scoring
+ */
+export async function trackTrailFinderSuccess(params: {
+  useCaseId: string;
+  resultCount?: number;
+  location?: string;
+  hasVehicleInfo?: boolean;
+}): Promise<void> {
+  const client = getPayiClient();
+  if (client.isEnabled()) {
+    // Update the search_success KPI
+    client
+      .updateKpiScore('trail_finder', params.useCaseId, 'search_success', {
+        value: true,
+      })
+      .catch((err) => {
+        console.error('[Pay-i] Failed to update trail finder KPI:', err);
+      });
+
+    // Update result_count KPI if available
+    if (params.resultCount !== undefined) {
+      client
+        .updateKpiScore('trail_finder', params.useCaseId, 'result_count', {
+          value: params.resultCount,
+        })
+        .catch((err) => {
+          console.error('[Pay-i] Failed to update result_count KPI:', err);
+        });
+    }
+  }
+}
+
+/**
+ * Track a Route Planner AI call using the singleton client
+ */
+export async function trackRoutePlannerUsage(params: {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  userId?: string;
+  accountName?: string;
+  useCaseId?: string;
+  useCaseVersion?: number;
+  limitIds?: string[];
+  useCaseProperties?: Record<string, string>;
+  requestProperties?: Record<string, string>;
+  httpStatus?: number;
+}): Promise<PayiIngestResponse | null> {
+  const client = getPayiClient();
+  if (client.isEnabled()) {
+    return client.trackAnthropicCall({
+      ...params,
+      useCaseName: 'trail_planner',
+    }).catch((err) => {
+      console.error('[Pay-i] Failed to track route planner usage:', err);
+      return null;
+    });
+  }
+  return null;
+}
+
+/**
+ * Track a successful route plan with KPI scoring
+ */
+export async function trackRoutePlannerSuccess(params: {
+  useCaseId: string;
+  waypointCount?: number;
+  totalDistance?: number;
+  hasVehicleInfo?: boolean;
+}): Promise<void> {
+  const client = getPayiClient();
+  if (client.isEnabled()) {
+    // Update the plan_success KPI
+    client
+      .updateKpiScore('trail_planner', params.useCaseId, 'plan_success', {
+        value: true,
+      })
+      .catch((err) => {
+        console.error('[Pay-i] Failed to update route planner KPI:', err);
+      });
+
+    // Update waypoint_count KPI if available
+    if (params.waypointCount !== undefined) {
+      client
+        .updateKpiScore('trail_planner', params.useCaseId, 'waypoint_count', {
+          value: params.waypointCount,
+        })
+        .catch((err) => {
+          console.error('[Pay-i] Failed to update waypoint_count KPI:', err);
+        });
+    }
+  }
+}
+
 // ============================================================================
 // Pay-i Proxy Client
 // ============================================================================

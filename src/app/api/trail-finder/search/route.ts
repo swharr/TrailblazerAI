@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildTrailFinderPrompt, calculateVehicleCapabilityScore } from '@/lib/trail-finder-prompts';
 import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { generateUseCaseId, trackTrailFinderUsage, trackTrailFinderSuccess } from '@/lib/payi-client';
 import { Prisma } from '@prisma/client';
 
 /** Default model for trail search (needs web search capability) */
@@ -208,6 +209,10 @@ export async function POST(
     // Build the prompt
     const prompt = buildTrailFinderPrompt(searchInput);
 
+    // Track timing and generate use case ID for Pay-i
+    const startTime = Date.now();
+    const useCaseId = generateUseCaseId();
+
     // Create Anthropic client with web search enabled
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -281,6 +286,36 @@ export async function POST(
 
     // Calculate capability score (use our calculation for consistency)
     const capabilityScore = calculateVehicleCapabilityScore(vehicleInfo);
+
+    // Track usage with Pay-i (fire and forget)
+    const latencyMs = Date.now() - startTime;
+    trackTrailFinderUsage({
+      model: TRAIL_FINDER_MODEL,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      latencyMs,
+      userId: session.user?.email || undefined,
+      useCaseId,
+      useCaseProperties: {
+        location: searchInput.location,
+        difficulty_pref: searchInput.difficultyPref || 'any',
+        trip_length: searchInput.tripLength || 'any',
+        has_vehicle: vehicleInfo ? 'true' : 'false',
+      },
+      requestProperties: {
+        result_count: String(parsed.recommendations.length),
+        search_radius: String(searchInput.searchRadius),
+        capability_score: String(capabilityScore),
+      },
+    });
+
+    // Track success KPIs with Pay-i (fire and forget)
+    trackTrailFinderSuccess({
+      useCaseId,
+      resultCount: parsed.recommendations.length,
+      location: searchInput.location,
+      hasVehicleInfo: !!vehicleInfo,
+    });
 
     // Build result
     const result: TrailSearchResult = {
