@@ -279,8 +279,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, provider: response });
   } catch (error) {
     console.error('Error updating AI provider config:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to update provider configuration' },
+      { error: `Failed to update provider configuration: ${errorMessage}` },
       { status: 500 }
     );
   }
