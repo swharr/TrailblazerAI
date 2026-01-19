@@ -170,6 +170,26 @@ jobs:
             --from-literal=BEDROCK_ENCRYPTED_KEY="${{ secrets.BEDROCK_ENCRYPTED_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Run database migrations
+        run: |
+          # Run migrations using a temporary pod with the new image
+          kubectl run prisma-migrate-${{ github.run_id }} \
+            --namespace trailblazer-ai \
+            --image=${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }} \
+            --restart=Never \
+            --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --command -- npx prisma migrate deploy
+
+          # Wait for migration to complete
+          kubectl wait --for=condition=Ready pod/prisma-migrate-${{ github.run_id }} -n trailblazer-ai --timeout=60s || true
+          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/prisma-migrate-${{ github.run_id }} -n trailblazer-ai --timeout=120s
+
+          # Show migration output
+          kubectl logs prisma-migrate-${{ github.run_id }} -n trailblazer-ai
+
+          # Cleanup
+          kubectl delete pod prisma-migrate-${{ github.run_id }} -n trailblazer-ai --ignore-not-found
+
       - name: Restart deployments to pick up secrets
         run: |
           kubectl rollout restart deployment/trailblazer-ai -n trailblazer-ai
