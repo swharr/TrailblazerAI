@@ -20,10 +20,10 @@ async function getJudgeClient(): Promise<{
   model: string;
 } | null> {
   // Find a provider configured as judge model
+  // Note: isJudgeModel is sufficient - provider doesn't need to be "enabled" for general use
   const judgeConfig = await prisma.aIProviderConfig.findFirst({
     where: {
       isJudgeModel: true,
-      isEnabled: true,
     },
   });
 

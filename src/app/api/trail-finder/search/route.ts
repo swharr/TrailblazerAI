@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { isPayiProxyEnabled, trailFinderViaPayiProxy } from '@/lib/payi-client';
 import { Prisma } from '@prisma/client';
+import { evaluateTrailFinderResponse, isJudgeEnabled } from '@/lib/judge-service';
 
 /** Default model for trail search (needs web search capability) */
 const TRAIL_FINDER_MODEL = 'claude-sonnet-4-20250514';
@@ -369,6 +370,43 @@ export async function POST(
       console.error('[trail-finder] Failed to save to database:', dbError);
       // Don't fail the request - search was successful
     }
+
+    // Run judge evaluation in background (don't block the response)
+    isJudgeEnabled().then(async (judgeEnabled) => {
+      if (judgeEnabled) {
+        console.log('[trail-finder] Running background judge evaluation...');
+        try {
+          const judgeResult = await evaluateTrailFinderResponse(
+            {
+              location: searchInput.location,
+              searchRadius: searchInput.searchRadius,
+              difficultyPref: searchInput.difficultyPref,
+              tripLength: searchInput.tripLength,
+              sceneryTypes: searchInput.sceneryTypes,
+            },
+            responseText,
+            { maxRetries: 1, autoImprove: false }
+          );
+
+          if (!judgeResult.evaluation.passed) {
+            console.warn('[trail-finder] Judge flagged issues:', {
+              passed: judgeResult.evaluation.passed,
+              score: judgeResult.evaluation.overallScore,
+              hallucinationSeverity: judgeResult.evaluation.hallucination.severity,
+              accuracyIssues: judgeResult.evaluation.accuracy.issues,
+              unverifiedClaims: judgeResult.evaluation.accuracy.unverifiedClaims,
+            });
+          } else {
+            console.log('[trail-finder] Judge evaluation passed:', {
+              score: judgeResult.evaluation.overallScore,
+              iterations: judgeResult.iterations,
+            });
+          }
+        } catch (judgeError) {
+          console.error('[trail-finder] Judge evaluation failed:', judgeError);
+        }
+      }
+    });
 
     console.log('[trail-finder] Returning', result.recommendations.length, 'recommendations');
 
