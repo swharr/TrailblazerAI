@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { encrypt, decrypt, maskApiKey } from '@/lib/encryption';
+import { encrypt, decrypt, maskApiKey, EncryptionProvider } from '@/lib/encryption';
 
 const VALID_PROVIDERS = ['anthropic', 'openai', 'google', 'xai', 'bedrock'] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
@@ -86,7 +86,7 @@ export async function GET() {
             ciphertext: config.encryptedApiKey,
             iv: config.keyIv,
             authTag: config.keyAuthTag,
-          });
+          }, provider as EncryptionProvider);
           maskedKey = maskApiKey(decrypted);
         } catch {
           maskedKey = '****[decryption error]';
@@ -101,7 +101,7 @@ export async function GET() {
             ciphertext: config.encryptedSecretKey,
             iv: config.secretKeyIv,
             authTag: config.secretKeyAuthTag,
-          });
+          }, provider as EncryptionProvider);
           maskedSecretKey = maskApiKey(decrypted);
         } catch {
           maskedSecretKey = '****[decryption error]';
@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
         updateData.keyIv = null;
         updateData.keyAuthTag = null;
       } else {
-        // Encrypt and store the new key
-        const encrypted = encrypt(apiKey);
+        // Encrypt and store the new key with provider-specific encryption key
+        const encrypted = encrypt(apiKey, provider as EncryptionProvider);
         updateData.encryptedApiKey = encrypted.ciphertext;
         updateData.keyIv = encrypted.iv;
         updateData.keyAuthTag = encrypted.authTag;
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
         updateData.secretKeyIv = null;
         updateData.secretKeyAuthTag = null;
       } else {
-        const encrypted = encrypt(secretKey);
+        const encrypted = encrypt(secretKey, provider as EncryptionProvider);
         updateData.encryptedSecretKey = encrypted.ciphertext;
         updateData.secretKeyIv = encrypted.iv;
         updateData.secretKeyAuthTag = encrypted.authTag;
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
           ciphertext: config.encryptedApiKey,
           iv: config.keyIv,
           authTag: config.keyAuthTag,
-        });
+        }, provider as EncryptionProvider);
         maskedKey = maskApiKey(decrypted);
       } catch {
         maskedKey = '****[decryption error]';
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
           ciphertext: config.encryptedSecretKey,
           iv: config.secretKeyIv,
           authTag: config.secretKeyAuthTag,
-        });
+        }, provider as EncryptionProvider);
         maskedSecretKey = maskApiKey(decrypted);
       } catch {
         maskedSecretKey = '****[decryption error]';
