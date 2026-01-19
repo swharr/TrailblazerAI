@@ -172,23 +172,19 @@ jobs:
 
       - name: Run database migrations
         run: |
+          # Delete any existing migration pod from previous runs
+          kubectl delete pod prisma-migrate -n trailblazer-ai --ignore-not-found
+
           # Run migrations using a temporary pod with the new image
-          kubectl run prisma-migrate-${{ github.run_id }} \
+          kubectl run prisma-migrate \
             --namespace trailblazer-ai \
             --image=${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }} \
             --restart=Never \
             --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --rm -i \
             --command -- npx prisma migrate deploy
 
-          # Wait for migration to complete
-          kubectl wait --for=condition=Ready pod/prisma-migrate-${{ github.run_id }} -n trailblazer-ai --timeout=60s || true
-          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/prisma-migrate-${{ github.run_id }} -n trailblazer-ai --timeout=120s
-
-          # Show migration output
-          kubectl logs prisma-migrate-${{ github.run_id }} -n trailblazer-ai
-
-          # Cleanup
-          kubectl delete pod prisma-migrate-${{ github.run_id }} -n trailblazer-ai --ignore-not-found
+          echo "Migration completed successfully"
 
       - name: Restart deployments to pick up secrets
         run: |
