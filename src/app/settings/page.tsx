@@ -1029,38 +1029,22 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* AI Provider Settings */}
+        {/* AI Provider Settings - Admin Only */}
         <Card>
           <CardHeader>
             <CardTitle>AI Provider</CardTitle>
             <CardDescription>
-              Select your preferred AI provider for trail analysis and route planning.
+              AI provider settings are managed by administrators.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ai-provider">Primary Provider</Label>
-              <Select defaultValue="anthropic">
-                <SelectTrigger id="ai-provider">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
-                  <SelectItem value="openai">OpenAI (GPT-4)</SelectItem>
-                  <SelectItem value="google">Google AI (Gemini)</SelectItem>
-                  <SelectItem value="bedrock">AWS Bedrock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Smart Routing</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically select the best model for each task
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              API keys, model selection, and provider configuration are available in the{' '}
+              <a href="/admin" className="text-primary hover:underline">
+                Administration panel
+              </a>
+              .
+            </p>
           </CardContent>
         </Card>
 

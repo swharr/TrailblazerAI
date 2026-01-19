@@ -193,6 +193,7 @@ export class AnthropicClient implements ModelProvider {
     mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
   } {
     // Check if it's a data URL
+    // Note: AVIF is converted to WebP on the client side before upload
     const dataUrlMatch = dataUrl.match(
       /^data:(image\/(jpeg|png|gif|webp));base64,(.+)$/
     );
@@ -221,6 +222,7 @@ export class AnthropicClient implements ModelProvider {
 
   /**
    * Detect image type from base64 data
+   * Note: AVIF is converted to WebP on the client side, so it's not included here
    * @param base64 - Raw base64 string
    * @returns Detected media type
    */
@@ -228,7 +230,7 @@ export class AnthropicClient implements ModelProvider {
     base64: string
   ): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' {
     // Decode first few bytes to check magic numbers
-    const prefix = base64.substring(0, 20);
+    const prefix = base64.substring(0, 30);
 
     // PNG: starts with iVBORw
     if (prefix.startsWith('iVBORw')) {

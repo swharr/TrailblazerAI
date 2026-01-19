@@ -9,7 +9,7 @@ TrailBlazer AI is an overland route planning and trail analysis application buil
 ## Quick Start
 
 ```bash
-docker compose up -d          # Start PostgreSQL
+docker compose up -d          # Start PostgreSQL (port 5433)
 npx prisma migrate dev        # Run migrations (if needed)
 npm run dev                   # http://localhost:3636
 ```
@@ -18,13 +18,16 @@ npm run dev                   # http://localhost:3636
 
 ```bash
 npm run dev          # Development server (port 3636)
+npm run dev:clean    # Clear .next cache and start dev server
 npm run build        # Production build
 npm run lint         # ESLint
 npm run format       # Prettier
-npx prisma studio    # Database GUI
+npx prisma studio    # Database GUI (http://localhost:5555)
 npx prisma migrate dev   # Run migrations
 npx prisma generate      # Regenerate Prisma client
 ```
+
+Note: No test suite is configured. PostgreSQL runs on port 5433 (not default 5432).
 
 ## Architecture
 
@@ -48,6 +51,22 @@ The main feature analyzes trail photos using AI vision models:
 5. **Results**: `src/components/upload/TrailAnalysisResults.tsx` displays analysis
 
 The AI returns structured JSON matching `TrailAnalysis` type in `src/lib/types.ts`.
+
+### Pay-i Proxy Service (Production)
+
+In production, AI calls route through a Python FastAPI proxy for usage instrumentation:
+
+```
+Browser → Next.js API → Pay-i Proxy (Python) → Anthropic API
+                              ↓
+                         Pay-i Dashboard
+```
+
+- **Proxy service**: `services/payi-proxy/` - FastAPI with Pay-i SDK instrumentation
+- **Client**: `src/lib/payi-client.ts` - TypeScript client for the proxy
+- **K8s manifests**: `k8s/base/payi-proxy-*.yaml`
+
+The proxy is optional; without `PAYI_PROXY_URL`, the app calls Anthropic directly.
 
 ### Model Provider Pattern
 
@@ -79,18 +98,20 @@ PlannedRoute → waypoints (JSON array)
 ### Key Patterns
 
 - React Server Components by default; "use client" only when needed
-- All external API calls go through `/app/api/` routes
+- All external API calls go through `/app/api/` routes (no direct client calls to external APIs)
 - Mobile-first responsive design (Sheet for mobile nav, fixed sidebar for desktop)
 - Custom colors: `trail-green`, `trail-brown`, `trail-orange`, `trail-tan`, `trail-cream`
+- Cost tracking required on every model API call (stored in `AnalysisMetrics`)
 
 ## Code Style
 
 - TypeScript strict mode; avoid `any`
 - Functional components with hooks (no classes)
 - Async/await over promise chains
-- Tailwind utilities over custom CSS
+- Tailwind utilities over custom CSS; use Tailwind's spacing scale (4, 8, 16, 24, 32)
 - One component per file, default export
 - Shared types in `src/lib/types.ts`
+- No commented-out code (use git history)
 
 ## Environment Variables
 
@@ -107,7 +128,7 @@ Optional:
 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET    # Google OAuth
 APPLE_CLIENT_ID, APPLE_CLIENT_SECRET      # Apple OAuth
 MAPBOX_ACCESS_TOKEN                       # Maps
-PAYI_BASE_URL                             # Pay-i API base URL (e.g., https://your-app.pay-i.com)
+PAYI_PROXY_URL                            # Pay-i proxy URL (e.g., http://payi-proxy:8000 in K8s)
 PAYI_API_KEY                              # Pay-i API key for usage tracking
 ```
 
@@ -115,7 +136,20 @@ PAYI_API_KEY                              # Pay-i API key for usage tracking
 
 Swagger/OpenAPI documentation is available at `/api-docs` when running the development server.
 
-API routes are documented with JSDoc annotations that generate the OpenAPI spec.
+## Deployment
+
+### Kubernetes (AKS)
+
+```bash
+# Deploy with Horizontal Pod Autoscaler
+kubectl apply -k k8s/overlays/aks
+
+# Check status
+kubectl get pods -n trailblazer-ai
+kubectl logs deployment/payi-proxy -n trailblazer-ai  # Proxy logs
+```
+
+K8s structure: `k8s/base/` contains core manifests; `k8s/overlays/` has environment-specific patches (aks, hpa, vpa).
 
 ## Session State
 

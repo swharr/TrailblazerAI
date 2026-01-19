@@ -26,6 +26,7 @@ model User {
   vehicles       VehicleProfile[]
   analyses       TrailAnalysis[]
   plannedRoutes  PlannedRoute[]
+  trailSearches  TrailSearch[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -133,6 +134,7 @@ model VehicleProfile {
   isDefault        Boolean  @default(false)
 
   analyses         TrailAnalysis[]
+  trailSearches    TrailSearch[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -194,4 +196,58 @@ model AnalysisMetrics {
   latencyMs    Int
 
   createdAt    DateTime      @default(now())
+}
+
+// AI Provider Configuration (admin-managed, encrypted API keys)
+model AIProviderConfig {
+  id              String   @id @default(cuid())
+  provider        String   @unique // 'anthropic' | 'openai' | 'google' | 'xai' | 'bedrock'
+
+  // Encrypted API key (AES-256-GCM)
+  encryptedApiKey String?  @db.Text
+  keyIv           String?
+  keyAuthTag      String?
+
+  // AWS Bedrock additional credentials
+  encryptedSecretKey String?  @db.Text
+  secretKeyIv        String?
+  secretKeyAuthTag   String?
+  awsRegion          String?
+
+  // Configuration
+  isEnabled       Boolean  @default(false)
+  isJudgeModel    Boolean  @default(false)
+  defaultModel    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([provider])
+}
+
+// Trail Finder Search History
+model TrailSearch {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Search inputs
+  vehicleId       String?
+  vehicle         VehicleProfile? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  location        String          // Search location (city, state, or coords)
+  searchRadius    Int?            // Miles from location
+  difficultyPref  String?         // easy, moderate, difficult, any
+  tripLength      String?         // day-trip, weekend, multi-day
+  sceneryTypes    String[]        // desert, forest, mountain, etc.
+
+  // Results
+  results         Json            // Array of TrailRecommendation objects
+  resultCount     Int
+  searchSummary   String?  @db.Text
+  vehicleCapabilityScore Int?     // 1-5 based on vehicle features
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }

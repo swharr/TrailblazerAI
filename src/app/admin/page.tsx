@@ -88,6 +88,28 @@ interface SettingMeta {
   label: string;
 }
 
+interface ProviderConfig {
+  provider: string;
+  isEnabled: boolean;
+  isJudgeModel: boolean;
+  defaultModel: string | null;
+  hasApiKey: boolean;
+  maskedKey: string | null;
+  hasSecretKey?: boolean;
+  maskedSecretKey?: string | null;
+  awsRegion?: string | null;
+  updatedAt: string | null;
+}
+
+interface ProviderEditState {
+  apiKey?: string;
+  secretKey?: string;
+  awsRegion?: string;
+  isEnabled?: boolean;
+  isJudgeModel?: boolean;
+  defaultModel?: string;
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -103,6 +125,11 @@ export default function AdminPage() {
   // Settings state
   const [settings, setSettings] = useState<Record<string, SettingMeta>>({});
   const [editedSettings, setEditedSettings] = useState<Record<string, string>>({});
+
+  // AI Provider state
+  const [providerConfigs, setProviderConfigs] = useState<Record<string, ProviderConfig>>({});
+  const [providerEdits, setProviderEdits] = useState<Record<string, ProviderEditState>>({});
+  const [savingProvider, setSavingProvider] = useState<string | null>(null);
 
   // User management state
   const [users, setUsers] = useState<User[]>([]);
@@ -149,14 +176,124 @@ export default function AdminPage() {
     }
   }, [userSearch]);
 
+  // Fetch AI provider configs
+  const fetchProviders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/ai-providers');
+      if (!res.ok) throw new Error('Failed to fetch provider configs');
+
+      const data = await res.json();
+      const configs: Record<string, ProviderConfig> = {};
+      for (const provider of data.providers || []) {
+        configs[provider.provider] = provider;
+      }
+      setProviderConfigs(configs);
+    } catch (err) {
+      console.error('Failed to load provider configs:', err);
+    }
+  }, []);
+
+  // Save a single provider
+  const saveProvider = async (provider: string) => {
+    setSavingProvider(provider);
+    setError(null);
+    setSaveSuccess(null);
+
+    try {
+      const edits = providerEdits[provider] || {};
+      const config = providerConfigs[provider];
+
+      const body: Record<string, unknown> = { provider };
+
+      // Include API key if edited
+      if (edits.apiKey !== undefined) {
+        body.apiKey = edits.apiKey;
+      }
+
+      // Include secret key for bedrock
+      if (provider === 'bedrock' && edits.secretKey !== undefined) {
+        body.secretKey = edits.secretKey;
+      }
+
+      // Include AWS region for bedrock
+      if (provider === 'bedrock') {
+        body.awsRegion = edits.awsRegion ?? config?.awsRegion ?? 'us-west-2';
+      }
+
+      // Include toggles and model selection
+      body.isEnabled = edits.isEnabled ?? config?.isEnabled ?? false;
+      body.isJudgeModel = edits.isJudgeModel ?? config?.isJudgeModel ?? false;
+      body.defaultModel = edits.defaultModel ?? config?.defaultModel;
+
+      const res = await fetch('/api/admin/ai-providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save provider');
+      }
+
+      // Update the config in state
+      setProviderConfigs((prev) => ({
+        ...prev,
+        [provider]: data.provider,
+      }));
+
+      // Clear edits for this provider
+      setProviderEdits((prev) => {
+        const newEdits = { ...prev };
+        delete newEdits[provider];
+        return newEdits;
+      });
+
+      setSaveSuccess(`${provider.charAt(0).toUpperCase() + provider.slice(1)} settings saved successfully.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save provider');
+    } finally {
+      setSavingProvider(null);
+    }
+  };
+
+  // Update provider edit state
+  const updateProviderEdit = (provider: string, field: keyof ProviderEditState, value: string | boolean) => {
+    setProviderEdits((prev) => ({
+      ...prev,
+      [provider]: {
+        ...prev[provider],
+        [field]: value,
+      },
+    }));
+  };
+
+  // Get the effective value for a provider field (edit state or saved config)
+  const getProviderValue = <K extends keyof ProviderEditState>(
+    provider: string,
+    field: K
+  ): ProviderEditState[K] | undefined => {
+    const edit = providerEdits[provider]?.[field];
+    if (edit !== undefined) return edit;
+    const config = providerConfigs[provider];
+    if (!config) return undefined;
+    if (field === 'isEnabled') return config.isEnabled as ProviderEditState[K];
+    if (field === 'isJudgeModel') return config.isJudgeModel as ProviderEditState[K];
+    if (field === 'defaultModel') return (config.defaultModel ?? undefined) as ProviderEditState[K];
+    if (field === 'awsRegion') return (config.awsRegion ?? undefined) as ProviderEditState[K];
+    return undefined;
+  };
+
   // Initial load
   useEffect(() => {
     if (status === 'authenticated') {
       fetchSettings();
+      fetchProviders();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin');
     }
-  }, [status, fetchSettings, router]);
+  }, [status, fetchSettings, fetchProviders, router]);
 
   // Update a setting value
   const updateSetting = (key: string, value: string) => {
@@ -333,24 +470,46 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2">
                 Anthropic
                 <Badge variant="outline">Claude</Badge>
+                {providerConfigs.anthropic?.isEnabled && (
+                  <Badge variant="default">Enabled</Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Configure Anthropic Claude API for trail analysis and intelligent routing.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enabled</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow this provider to be used for analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('anthropic', 'isEnabled') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('anthropic', 'isEnabled', v)}
+                />
+              </div>
+              <Separator />
               <ApiKeyField
                 id="anthropic-key"
                 label="API Key"
                 placeholder="sk-ant-api03-..."
                 description="Get your API key from console.anthropic.com"
-                value={getSettingValue('ANTHROPIC_API_KEY')}
-                onChange={(v) => updateSetting('ANTHROPIC_API_KEY', v)}
-                configured={settings['ANTHROPIC_API_KEY']?.configured}
+                value={providerEdits.anthropic?.apiKey ?? ''}
+                onChange={(v) => updateProviderEdit('anthropic', 'apiKey', v)}
+                configured={providerConfigs.anthropic?.hasApiKey}
               />
+              {providerConfigs.anthropic?.maskedKey && !providerEdits.anthropic?.apiKey && (
+                <p className="text-sm text-muted-foreground">Current key: {providerConfigs.anthropic.maskedKey}</p>
+              )}
               <div className="space-y-2">
                 <Label>Default Model</Label>
-                <Select defaultValue="claude-sonnet-4-20250514">
+                <Select
+                  value={getProviderValue('anthropic', 'defaultModel') ?? 'claude-sonnet-4-20250514'}
+                  onValueChange={(v) => updateProviderEdit('anthropic', 'defaultModel', v)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -362,10 +521,22 @@ export default function AdminPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Use as Judge Model</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include in comparison mode analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('anthropic', 'isJudgeModel') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('anthropic', 'isJudgeModel', v)}
+                />
+              </div>
               <Separator />
-              <Button onClick={() => handleSave('ai')} disabled={saving || settingsMode === 'local'}>
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Save AI Settings
+              <Button onClick={() => saveProvider('anthropic')} disabled={savingProvider === 'anthropic'}>
+                {savingProvider === 'anthropic' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save
               </Button>
             </CardContent>
           </Card>
@@ -376,24 +547,46 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2">
                 OpenAI
                 <Badge variant="outline">GPT-4</Badge>
+                {providerConfigs.openai?.isEnabled && (
+                  <Badge variant="default">Enabled</Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Configure OpenAI GPT models for alternative analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enabled</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow this provider to be used for analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('openai', 'isEnabled') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('openai', 'isEnabled', v)}
+                />
+              </div>
+              <Separator />
               <ApiKeyField
                 id="openai-key"
                 label="API Key"
                 placeholder="sk-..."
                 description="Get your API key from platform.openai.com"
-                value={getSettingValue('OPENAI_API_KEY')}
-                onChange={(v) => updateSetting('OPENAI_API_KEY', v)}
-                configured={settings['OPENAI_API_KEY']?.configured}
+                value={providerEdits.openai?.apiKey ?? ''}
+                onChange={(v) => updateProviderEdit('openai', 'apiKey', v)}
+                configured={providerConfigs.openai?.hasApiKey}
               />
+              {providerConfigs.openai?.maskedKey && !providerEdits.openai?.apiKey && (
+                <p className="text-sm text-muted-foreground">Current key: {providerConfigs.openai.maskedKey}</p>
+              )}
               <div className="space-y-2">
                 <Label>Default Model</Label>
-                <Select defaultValue="gpt-4o">
+                <Select
+                  value={getProviderValue('openai', 'defaultModel') ?? 'gpt-4o'}
+                  onValueChange={(v) => updateProviderEdit('openai', 'defaultModel', v)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -405,6 +598,23 @@ export default function AdminPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Use as Judge Model</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include in comparison mode analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('openai', 'isJudgeModel') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('openai', 'isJudgeModel', v)}
+                />
+              </div>
+              <Separator />
+              <Button onClick={() => saveProvider('openai')} disabled={savingProvider === 'openai'}>
+                {savingProvider === 'openai' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
             </CardContent>
           </Card>
 
@@ -414,24 +624,46 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2">
                 Google AI
                 <Badge variant="outline">Gemini</Badge>
+                {providerConfigs.google?.isEnabled && (
+                  <Badge variant="default">Enabled</Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Configure Google Gemini models for vision analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enabled</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow this provider to be used for analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('google', 'isEnabled') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('google', 'isEnabled', v)}
+                />
+              </div>
+              <Separator />
               <ApiKeyField
                 id="google-ai-key"
                 label="API Key"
                 placeholder="AIza..."
                 description="Get your API key from makersuite.google.com"
-                value={getSettingValue('GOOGLE_AI_API_KEY')}
-                onChange={(v) => updateSetting('GOOGLE_AI_API_KEY', v)}
-                configured={settings['GOOGLE_AI_API_KEY']?.configured}
+                value={providerEdits.google?.apiKey ?? ''}
+                onChange={(v) => updateProviderEdit('google', 'apiKey', v)}
+                configured={providerConfigs.google?.hasApiKey}
               />
+              {providerConfigs.google?.maskedKey && !providerEdits.google?.apiKey && (
+                <p className="text-sm text-muted-foreground">Current key: {providerConfigs.google.maskedKey}</p>
+              )}
               <div className="space-y-2">
                 <Label>Default Model</Label>
-                <Select defaultValue="gemini-2.0-flash">
+                <Select
+                  value={getProviderValue('google', 'defaultModel') ?? 'gemini-2.0-flash'}
+                  onValueChange={(v) => updateProviderEdit('google', 'defaultModel', v)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -442,6 +674,23 @@ export default function AdminPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Use as Judge Model</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include in comparison mode analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('google', 'isJudgeModel') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('google', 'isJudgeModel', v)}
+                />
+              </div>
+              <Separator />
+              <Button onClick={() => saveProvider('google')} disabled={savingProvider === 'google'}>
+                {savingProvider === 'google' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
             </CardContent>
           </Card>
 
@@ -451,21 +700,76 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2">
                 xAI
                 <Badge variant="outline">Grok</Badge>
+                {providerConfigs.xai?.isEnabled && (
+                  <Badge variant="default">Enabled</Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Configure xAI Grok models for alternative analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enabled</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow this provider to be used for analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('xai', 'isEnabled') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('xai', 'isEnabled', v)}
+                />
+              </div>
+              <Separator />
               <ApiKeyField
                 id="xai-key"
                 label="API Key"
                 placeholder="xai-..."
                 description="Get your API key from x.ai"
-                value={getSettingValue('XAI_API_KEY')}
-                onChange={(v) => updateSetting('XAI_API_KEY', v)}
-                configured={settings['XAI_API_KEY']?.configured}
+                value={providerEdits.xai?.apiKey ?? ''}
+                onChange={(v) => updateProviderEdit('xai', 'apiKey', v)}
+                configured={providerConfigs.xai?.hasApiKey}
               />
+              {providerConfigs.xai?.maskedKey && !providerEdits.xai?.apiKey && (
+                <p className="text-sm text-muted-foreground">Current key: {providerConfigs.xai.maskedKey}</p>
+              )}
+              <div className="space-y-2">
+                <Label>Default Model</Label>
+                <Select
+                  value={getProviderValue('xai', 'defaultModel') ?? 'grok-3'}
+                  onValueChange={(v) => updateProviderEdit('xai', 'defaultModel', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grok-3">Grok 3 (Recommended)</SelectItem>
+                    <SelectItem value="grok-3-fast">Grok 3 Fast</SelectItem>
+                    <SelectItem value="grok-4-1">Grok 4.1</SelectItem>
+                    <SelectItem value="grok-4-1-fast-reasoning">Grok 4.1 Fast Reasoning</SelectItem>
+                    <SelectItem value="grok-2-vision">Grok 2 Vision</SelectItem>
+                    <SelectItem value="grok-2-image">Grok 2 Image</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Use as Judge Model</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include in comparison mode analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('xai', 'isJudgeModel') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('xai', 'isJudgeModel', v)}
+                />
+              </div>
+              <Separator />
+              <Button onClick={() => saveProvider('xai')} disabled={savingProvider === 'xai'}>
+                {savingProvider === 'xai' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
             </CardContent>
           </Card>
 
@@ -475,33 +779,55 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2">
                 AWS Bedrock
                 <Badge variant="outline">Claude on AWS</Badge>
+                {providerConfigs.bedrock?.isEnabled && (
+                  <Badge variant="default">Enabled</Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Configure AWS Bedrock for enterprise Claude access and Judge Model evaluation.
+                Configure AWS Bedrock for enterprise Claude access.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enabled</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow this provider to be used for analysis
+                  </p>
+                </div>
+                <Switch
+                  checked={getProviderValue('bedrock', 'isEnabled') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('bedrock', 'isEnabled', v)}
+                />
+              </div>
+              <Separator />
               <ApiKeyField
                 id="aws-access-key"
                 label="Access Key ID"
                 placeholder="AKIA..."
-                value={getSettingValue('AWS_ACCESS_KEY_ID')}
-                onChange={(v) => updateSetting('AWS_ACCESS_KEY_ID', v)}
-                configured={settings['AWS_ACCESS_KEY_ID']?.configured}
+                value={providerEdits.bedrock?.apiKey ?? ''}
+                onChange={(v) => updateProviderEdit('bedrock', 'apiKey', v)}
+                configured={providerConfigs.bedrock?.hasApiKey}
               />
+              {providerConfigs.bedrock?.maskedKey && !providerEdits.bedrock?.apiKey && (
+                <p className="text-sm text-muted-foreground">Current key: {providerConfigs.bedrock.maskedKey}</p>
+              )}
               <ApiKeyField
                 id="aws-secret-key"
                 label="Secret Access Key"
                 placeholder="..."
-                value={getSettingValue('AWS_SECRET_ACCESS_KEY')}
-                onChange={(v) => updateSetting('AWS_SECRET_ACCESS_KEY', v)}
-                configured={settings['AWS_SECRET_ACCESS_KEY']?.configured}
+                value={providerEdits.bedrock?.secretKey ?? ''}
+                onChange={(v) => updateProviderEdit('bedrock', 'secretKey', v)}
+                configured={providerConfigs.bedrock?.hasSecretKey}
               />
+              {providerConfigs.bedrock?.maskedSecretKey && !providerEdits.bedrock?.secretKey && (
+                <p className="text-sm text-muted-foreground">Current secret: {providerConfigs.bedrock.maskedSecretKey}</p>
+              )}
               <div className="space-y-2">
                 <Label>AWS Region</Label>
                 <Select
-                  value={getSettingValue('AWS_REGION') || 'us-west-2'}
-                  onValueChange={(v) => updateSetting('AWS_REGION', v)}
+                  value={getProviderValue('bedrock', 'awsRegion') ?? 'us-west-2'}
+                  onValueChange={(v) => updateProviderEdit('bedrock', 'awsRegion', v)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -518,11 +844,19 @@ export default function AdminPage() {
                 <div className="space-y-0.5">
                   <Label>Use as Judge Model</Label>
                   <p className="text-sm text-muted-foreground">
-                    Use Bedrock Claude to evaluate and score other model responses
+                    Include in comparison mode analysis
                   </p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={getProviderValue('bedrock', 'isJudgeModel') ?? false}
+                  onCheckedChange={(v) => updateProviderEdit('bedrock', 'isJudgeModel', v)}
+                />
               </div>
+              <Separator />
+              <Button onClick={() => saveProvider('bedrock')} disabled={savingProvider === 'bedrock'}>
+                {savingProvider === 'bedrock' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

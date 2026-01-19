@@ -361,3 +361,44 @@ export interface ComparisonResult {
   totalCost: number;
   totalLatency: number;
 }
+
+// Trail Finder Types
+export type TrailDifficultyPref = 'easy' | 'moderate' | 'difficult' | 'any';
+export type TripLength = 'day-trip' | 'weekend' | 'multi-day';
+export type SceneryType = 'desert' | 'forest' | 'mountain' | 'coastal' | 'canyon' | 'prairie' | 'alpine' | 'wetland';
+export type TrailSource = 'alltrails' | 'onx' | 'gaia' | 'forum' | 'other';
+export type VehicleCompatibility = 'excellent' | 'good' | 'marginal' | 'not-recommended';
+
+export interface TrailSearchInput {
+  vehicleId?: string;
+  vehicleInfo?: VehicleInfo;
+  location: string;
+  searchRadius?: number; // miles
+  difficultyPref?: TrailDifficultyPref;
+  tripLength?: TripLength;
+  sceneryTypes?: SceneryType[];
+}
+
+export interface TrailRecommendation {
+  name: string;
+  location: string;
+  source: TrailSource;
+  sourceUrl?: string;
+  difficulty: number; // 1-5
+  length?: string; // e.g., "12 miles"
+  elevationGain?: string;
+  description: string;
+  whyRecommended: string; // AI explanation of why this suits the vehicle
+  vehicleCompatibility: VehicleCompatibility;
+  sceneryType?: SceneryType[];
+  bestSeason?: string;
+  permits?: string;
+  warnings?: string[];
+}
+
+export interface TrailSearchResult {
+  query: TrailSearchInput;
+  recommendations: TrailRecommendation[];
+  searchSummary: string;
+  vehicleCapabilityScore: number; // 1-5 based on vehicle features
+}

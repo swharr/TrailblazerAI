@@ -29,11 +29,11 @@ export default function ImageUpload({
   const [error, setError] = useState<string | null>(null);
 
   const validateFile = (file: File): string | null => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
     const maxSize = 32 * 1024 * 1024; // 32MB max per image
 
     if (!validTypes.includes(file.type)) {
-      return 'Please upload a JPG, PNG, or WebP image';
+      return 'Please upload a JPG, PNG, WebP, or AVIF image';
     }
 
     if (file.size > maxSize) {
@@ -43,8 +43,45 @@ export default function ImageUpload({
     return null;
   };
 
+  /**
+   * Convert an image file to WebP format using Canvas API
+   * Used to convert AVIF (not supported by Anthropic API) to WebP
+   */
+  const convertToWebP = useCallback((file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Failed to convert image'));
+              return;
+            }
+            // Create a new File with .webp extension
+            const newFileName = file.name.replace(/\.[^/.]+$/, '.webp');
+            const convertedFile = new File([blob], newFileName, { type: 'image/webp' });
+            resolve(convertedFile);
+          },
+          'image/webp',
+          0.92 // Quality
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   const handleFiles = useCallback(
-    (files: FileList | File[]) => {
+    async (files: FileList | File[]) => {
       setError(null);
       const fileArray = Array.from(files);
 
@@ -64,11 +101,27 @@ export default function ImageUpload({
         }
       }
 
+      // Convert AVIF files to WebP (Anthropic API doesn't support AVIF)
+      const processedFiles: File[] = [];
+      for (const file of fileArray) {
+        if (file.type === 'image/avif') {
+          try {
+            const converted = await convertToWebP(file);
+            processedFiles.push(converted);
+          } catch {
+            setError('Failed to convert AVIF image. Please try a different format.');
+            return;
+          }
+        } else {
+          processedFiles.push(file);
+        }
+      }
+
       // Process all valid files
       const newImages: ImageFile[] = [];
       let processed = 0;
 
-      fileArray.forEach((file) => {
+      processedFiles.forEach((file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const result = e.target?.result as string;
@@ -79,7 +132,7 @@ export default function ImageUpload({
           });
           processed++;
 
-          if (processed === fileArray.length) {
+          if (processed === processedFiles.length) {
             setImages((prev) => {
               const updated = [...prev, ...newImages];
               onImagesChange(updated.map((img) => img.file));
@@ -90,7 +143,7 @@ export default function ImageUpload({
         reader.readAsDataURL(file);
       });
     },
-    [images.length, onImagesChange]
+    [images.length, onImagesChange, convertToWebP]
   );
 
   const handleDrop = useCallback(
@@ -150,7 +203,7 @@ export default function ImageUpload({
           <input
             type="file"
             id="trail-images"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/avif"
             onChange={handleChange}
             disabled={disabled}
             multiple
@@ -165,7 +218,7 @@ export default function ImageUpload({
               Drop trail photos here or click to upload
             </p>
             <p className="text-sm text-muted-foreground">
-              JPG, PNG, or WebP up to 32MB each (max {MAX_IMAGES} photos)
+              JPG, PNG, WebP, or AVIF up to 32MB each (max {MAX_IMAGES} photos)
             </p>
           </label>
         </div>
@@ -214,7 +267,7 @@ export default function ImageUpload({
                 <input
                   type="file"
                   id="trail-images-add"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/avif"
                   onChange={handleChange}
                   disabled={disabled}
                   multiple
