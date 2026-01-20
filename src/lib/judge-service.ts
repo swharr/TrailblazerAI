@@ -19,9 +19,18 @@ const PROVIDER_CATEGORIES: Record<string, string> = {
   xai: 'system.xai',
 };
 
+/** Map provider names to environment variable names */
+const PROVIDER_ENV_VARS: Record<string, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_AI_API_KEY',
+  xai: 'XAI_API_KEY',
+};
+
 /**
  * Get the configured judge model client
  * Returns null if no judge model is configured
+ * Falls back to environment variables if database key not available
  */
 async function getJudgeClient(): Promise<{
   provider: string;
@@ -37,41 +46,44 @@ async function getJudgeClient(): Promise<{
   });
 
   if (!judgeConfig) {
-    console.log('[judge-service] No judge model configured');
+    console.log('[judge-service] No judge model configured in database');
     return null;
   }
 
-  // Check encryption key
-  if (!hasEncryptionKey(judgeConfig.provider as EncryptionProvider)) {
-    console.error(`[judge-service] No encryption key for judge provider: ${judgeConfig.provider}`);
-    return null;
+  const provider = judgeConfig.provider;
+  const model = judgeConfig.defaultModel || getDefaultModel(provider);
+
+  // Try to get API key from database first
+  if (judgeConfig.encryptedApiKey && judgeConfig.keyIv && judgeConfig.keyAuthTag) {
+    if (hasEncryptionKey(provider as EncryptionProvider)) {
+      try {
+        const apiKey = decrypt(
+          {
+            ciphertext: judgeConfig.encryptedApiKey,
+            iv: judgeConfig.keyIv,
+            authTag: judgeConfig.keyAuthTag,
+          },
+          provider as EncryptionProvider
+        );
+        console.log(`[judge-service] Using database API key for ${provider}`);
+        return { provider, apiKey, model };
+      } catch (error) {
+        console.warn('[judge-service] Failed to decrypt database API key, trying env var fallback:', error);
+      }
+    }
   }
 
-  // Decrypt API key
-  if (!judgeConfig.encryptedApiKey || !judgeConfig.keyIv || !judgeConfig.keyAuthTag) {
-    console.error('[judge-service] Judge model has no API key configured');
-    return null;
+  // Fallback: Try environment variable
+  const envVar = PROVIDER_ENV_VARS[provider];
+  const envApiKey = envVar ? process.env[envVar] : undefined;
+
+  if (envApiKey) {
+    console.log(`[judge-service] Using environment variable ${envVar} for ${provider} judge model`);
+    return { provider, apiKey: envApiKey, model };
   }
 
-  try {
-    const apiKey = decrypt(
-      {
-        ciphertext: judgeConfig.encryptedApiKey,
-        iv: judgeConfig.keyIv,
-        authTag: judgeConfig.keyAuthTag,
-      },
-      judgeConfig.provider as EncryptionProvider
-    );
-
-    return {
-      provider: judgeConfig.provider,
-      apiKey,
-      model: judgeConfig.defaultModel || getDefaultModel(judgeConfig.provider),
-    };
-  } catch (error) {
-    console.error('[judge-service] Failed to decrypt judge API key:', error);
-    return null;
-  }
+  console.error(`[judge-service] No API key found for judge provider ${provider} (checked database and ${envVar})`);
+  return null;
 }
 
 /**
