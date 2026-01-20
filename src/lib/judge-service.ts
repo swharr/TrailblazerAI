@@ -469,12 +469,12 @@ export async function evaluateTrailAnalysisResponse(
 
 /**
  * Check if judge evaluation is enabled
+ * Only requires isJudgeModel - provider doesn't need to be "enabled" for general use
  */
 export async function isJudgeEnabled(): Promise<boolean> {
   const judgeConfig = await prisma.aIProviderConfig.findFirst({
     where: {
       isJudgeModel: true,
-      isEnabled: true,
     },
   });
   return !!judgeConfig;
