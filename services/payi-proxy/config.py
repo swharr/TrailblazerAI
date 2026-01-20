@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     google_api_key: str = ""
+    xai_api_key: str = ""
 
     # Service Configuration
     service_name: str = "trailblazer-payi-proxy"

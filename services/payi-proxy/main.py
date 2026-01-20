@@ -473,6 +473,25 @@ def run_judge_evaluation(
                 input_tokens = response.usage_metadata.prompt_token_count or 0
                 output_tokens = response.usage_metadata.candidates_token_count or 0
 
+        elif provider == "xai":
+            # xAI Grok uses OpenAI-compatible API
+            import openai
+            settings = get_settings()
+            if not settings.xai_api_key:
+                raise HTTPException(status_code=503, detail="xAI API key not configured")
+            client = openai.OpenAI(
+                api_key=settings.xai_api_key,
+                base_url="https://api.x.ai/v1",
+            )
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.choices[0].message.content or ""
+            input_tokens = response.usage.prompt_tokens if response.usage else 0
+            output_tokens = response.usage.completion_tokens if response.usage else 0
+
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
 
