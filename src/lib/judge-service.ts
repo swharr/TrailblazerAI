@@ -201,6 +201,24 @@ async function callJudgeModel(
       break;
     }
 
+    case 'xai': {
+      // xAI Grok uses OpenAI-compatible API
+      const OpenAI = (await import('openai')).default;
+      const client = new OpenAI({
+        apiKey,
+        baseURL: 'https://api.x.ai/v1',
+      });
+      const response = await client.chat.completions.create({
+        model,
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      text = response.choices[0]?.message?.content || '';
+      inputTokens = response.usage?.prompt_tokens || 0;
+      outputTokens = response.usage?.completion_tokens || 0;
+      break;
+    }
+
     default:
       throw new Error(`Unsupported judge provider: ${provider}`);
   }
