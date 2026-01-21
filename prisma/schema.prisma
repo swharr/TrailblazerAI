@@ -27,6 +27,7 @@ model User {
   analyses       TrailAnalysis[]
   plannedRoutes  PlannedRoute[]
   trailSearches  TrailSearch[]
+  trailRecords   TrailRecord[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -250,4 +251,64 @@ model TrailSearch {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// Trail Recorder - User-submitted trail documentation
+model TrailRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Trail info
+  name            String              // User-provided trail name
+  location        String?             // General location (city, region, etc.)
+  description     String?  @db.Text   // Trail description/notes
+  date            DateTime @default(now())  // Date of trail run
+
+  // Trail characteristics
+  difficulty      Int?                // 1-5 user rating
+  trailType       String[]            // dirt, rock, sand, mud, water-crossing, etc.
+  distance        Float?              // Distance in miles
+  duration        Int?                // Duration in minutes
+
+  // GPS data (optional)
+  startCoordinates Json?              // {latitude, longitude, elevation?}
+  endCoordinates   Json?              // {latitude, longitude, elevation?}
+  gpsTrack         Json?              // Array of coordinate points
+
+  // Photos relation
+  photos          TrailRecordPhoto[]
+
+  // Sharing
+  isPublic        Boolean  @default(false)
+  shareToken      String?  @unique
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([shareToken])
+  @@index([isPublic])
+}
+
+model TrailRecordPhoto {
+  id            String      @id @default(cuid())
+  trailRecordId String
+  trailRecord   TrailRecord @relation(fields: [trailRecordId], references: [id], onDelete: Cascade)
+
+  // Photo data
+  imageData     String      @db.Text    // Base64 encoded image
+  mimeType      String                  // image/jpeg, image/png, etc.
+  caption       String?                 // Optional photo caption
+  order         Int         @default(0) // Display order
+
+  // Optional GPS from photo EXIF
+  latitude      Float?
+  longitude     Float?
+  takenAt       DateTime?
+
+  createdAt     DateTime    @default(now())
+
+  @@index([trailRecordId])
 }

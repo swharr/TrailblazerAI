@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, MapPin, Compass, FlaskConical } from 'lucide-react';
+import { Camera, Map, LayoutDashboard, Menu, Settings, ShieldCheck, Sparkles, MapPin, Compass, FlaskConical, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -40,6 +40,7 @@ const navSections: NavSection[] = [
       { title: 'Trail Analysis', href: '/sample-analysis', icon: Sparkles },
       { title: 'Route Planner', href: '/sample-route', icon: MapPin },
       { title: 'Trail Finder', href: '/sample-trail-finder', icon: Compass },
+      { title: 'Trail Recorder', href: '/sample-trail-recorder', icon: BookOpen },
     ],
   },
   {
@@ -48,6 +49,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Analyze Trail', href: '/analyze', icon: Camera },
       { title: 'Find Trails', href: '/trail-finder', icon: Compass },
+      { title: 'Trail Recorder', href: '/trail-recorder', icon: BookOpen },
       { title: 'Plan Routes', href: '/plan', icon: Map },
       { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { title: 'Settings', href: '/settings', icon: Settings },
